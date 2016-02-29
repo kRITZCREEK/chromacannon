@@ -8892,6 +8892,7 @@ var Data_Tuple = require("Data.Tuple");
 var Debug_Trace = require("Debug.Trace");
 var Graphics_Canvas = require("Graphics.Canvas");
 var Graphics_Drawing = require("Graphics.Drawing");
+var Graphics_Drawing_Font = require("Graphics.Drawing.Font");
 var $$Math = require("Math");
 var Signal = require("Signal");
 var Signal_DOM = require("Signal.DOM");
@@ -8911,7 +8912,8 @@ var scaleV2 = function (s) {
     };
 };
 var renderProjectile = function (v) {
-    return Graphics_Drawing.filled(Graphics_Drawing.fillColor(v.color))(Graphics_Drawing.circle(v.position.x)(v.position.y)(20.0));
+    var c = Graphics_Drawing.circle(v.position.x)(v.position.y)(20.0);
+    return Prelude["<>"](Graphics_Drawing.semigroupDrawing)(Graphics_Drawing.filled(Graphics_Drawing.fillColor(v.color))(c))(Graphics_Drawing.outlined(Graphics_Drawing.lineWidth(1.0))(c));
 };
 var initialState = {
     projectiles: [  ], 
@@ -8925,8 +8927,15 @@ var cull = function (v) {
 var colorFromDirection = function (cannonDirection) {
     return Color.hsl(360.0 * $$Math.sin(cannonDirection))(0.8)(0.5);
 };
-var clear = Graphics_Drawing.filled(Graphics_Drawing.fillColor(Color.white))(Graphics_Drawing.rectangle(0.0)(0.0)(800.0)(800.0));
+var clearCannon = Graphics_Drawing.translate(18.0)(220.0)(Graphics_Drawing.filled(Graphics_Drawing.fillColor(Color.white))(Graphics_Drawing.circle(0.0)(0.0)(102.5)));
+var clear = Prelude["<>"](Graphics_Drawing.semigroupDrawing)(Graphics_Drawing.filled(Graphics_Drawing.fillColor(Color.black))(Graphics_Drawing.rectangle(0.0)(0.0)(800.0)(600.0)))(Graphics_Drawing.filled(Graphics_Drawing.fillColor(Color.white))(Graphics_Drawing.rectangle(10.0)(10.0)(780.0)(580.0)));
+var cannonPosition = {
+    x: 18.0, 
+    y: 280.0
+};
 var renderS = function (v) {
+    var infoText = Graphics_Drawing.text(Graphics_Drawing_Font.font(Graphics_Drawing_Font.monospace)(16)(Data_Monoid.mempty(Graphics_Drawing_Font.monoidFontOptions)))(100.0)(30.0)(Graphics_Drawing.fillColor(Color.black));
+    var infos = Prelude["<>"](Graphics_Drawing.semigroupDrawing)(infoText("Projectiles: " + Prelude.show(Prelude.showInt)(Data_Array.length(v.projectiles))))(Graphics_Drawing.translate(0.0)(20.0)(infoText("CannonDirection: " + Prelude.show(Prelude.showNumber)(v.cannonDirection))));
     var flash = (function () {
         var $34 = v.cooldown === 0;
         if ($34) {
@@ -8935,11 +8944,11 @@ var renderS = function (v) {
         if (!$34) {
             return Prelude["<>"](Graphics_Drawing.semigroupDrawing)(Graphics_Drawing.filled(Graphics_Drawing.fillColor(Color.black))(Graphics_Drawing.circle(0.0)(0.0)(20.0 + 30.0 / Data_Int.toNumber(v.cooldown))))(Graphics_Drawing.filled(Graphics_Drawing.fillColor(Color.white))(Graphics_Drawing.circle(0.0)(0.0)(10.0 + 30.0 / Data_Int.toNumber(v.cooldown))));
         };
-        throw new Error("Failed pattern match at Main line 96, column 5 - line 106, column 1: " + [ $34.constructor.name ]);
+        throw new Error("Failed pattern match at Main line 94, column 1 - line 95, column 1: " + [ $34.constructor.name ]);
     })();
     var color = Graphics_Drawing.fillColor(colorFromDirection(v.cannonDirection));
-    var cannon = Graphics_Drawing.translate(18.0)(220.0)(Graphics_Drawing.rotate(v.cannonDirection)(Prelude["<>"](Graphics_Drawing.semigroupDrawing)(Graphics_Drawing.translate(-10.0)(0.0)(Graphics_Drawing.filled(color)(Graphics_Drawing.rectangle(0.0)(0.0)(20.0)(100.0))))(Prelude["<>"](Graphics_Drawing.semigroupDrawing)(Graphics_Drawing.translate(-10.0)(0.0)(Graphics_Drawing.outlined(Prelude["<>"](Graphics_Drawing.semigroupOutlineStyle)(Graphics_Drawing.outlineColor(Color.black))(Graphics_Drawing.lineWidth(3.0)))(Graphics_Drawing.rectangle(0.0)(0.0)(20.0)(100.0))))(Prelude["<>"](Graphics_Drawing.semigroupDrawing)(Graphics_Drawing.filled(color)(Graphics_Drawing.circle(0.0)(0.0)(15.0)))(Prelude["<>"](Graphics_Drawing.semigroupDrawing)(Graphics_Drawing.outlined(Prelude["<>"](Graphics_Drawing.semigroupOutlineStyle)(Graphics_Drawing.outlineColor(Color.black))(Graphics_Drawing.lineWidth(3.0)))(Graphics_Drawing.circle(0.0)(0.0)(15.0)))(flash))))));
-    return Prelude["<>"](Graphics_Drawing.semigroupDrawing)(clear)(Prelude["<>"](Graphics_Drawing.semigroupDrawing)(cannon)(Data_Foldable.foldMap(Data_Foldable.foldableArray)(Graphics_Drawing.monoidDrawing)(renderProjectile)(v.projectiles)));
+    var cannon = Graphics_Drawing.translate(cannonPosition.x)(cannonPosition.y)(Graphics_Drawing.rotate(v.cannonDirection)(Prelude["<>"](Graphics_Drawing.semigroupDrawing)(Graphics_Drawing.translate(-10.0)(0.0)(Graphics_Drawing.filled(color)(Graphics_Drawing.rectangle(0.0)(0.0)(20.0)(100.0))))(Prelude["<>"](Graphics_Drawing.semigroupDrawing)(Graphics_Drawing.translate(-10.0)(0.0)(Graphics_Drawing.outlined(Prelude["<>"](Graphics_Drawing.semigroupOutlineStyle)(Graphics_Drawing.outlineColor(Color.black))(Graphics_Drawing.lineWidth(3.0)))(Graphics_Drawing.rectangle(0.0)(0.0)(20.0)(100.0))))(Prelude["<>"](Graphics_Drawing.semigroupDrawing)(Graphics_Drawing.filled(color)(Graphics_Drawing.circle(0.0)(0.0)(15.0)))(Prelude["<>"](Graphics_Drawing.semigroupDrawing)(Graphics_Drawing.outlined(Prelude["<>"](Graphics_Drawing.semigroupOutlineStyle)(Graphics_Drawing.outlineColor(Color.black))(Graphics_Drawing.lineWidth(3.0)))(Graphics_Drawing.circle(0.0)(0.0)(15.0)))(flash))))));
+    return Prelude["<>"](Graphics_Drawing.semigroupDrawing)(clear)(Prelude["<>"](Graphics_Drawing.semigroupDrawing)(Graphics_Drawing.shadow(Prelude["<>"](Graphics_Drawing.semigroupShadow)(Graphics_Drawing.shadowColor(Color.black))(Graphics_Drawing.shadowBlur(5.0)))(cannon))(Prelude["<>"](Graphics_Drawing.semigroupDrawing)(Data_Foldable.foldMap(Data_Foldable.foldableArray)(Graphics_Drawing.monoidDrawing)(renderProjectile)(v.projectiles))(infos)));
 };
 var addV2 = function (v) {
     return function (v1) {
@@ -8962,15 +8971,12 @@ var move = function (v) {
 var step = function (v) {
     return function (v1) {
         var newProjectiles = Data_Array.filter(cull)(Prelude.map(Prelude.functorArray)(move)(v1.projectiles));
-        var cannonDirection = $$Math.atan2(-(v.position.x - 15.0))(v.position.y - 220.0);
+        var cannonDirection = $$Math.atan2(-($$Math.max(cannonPosition.x)(v.position.x) - cannonPosition.x))(v.position.y - cannonPosition.y);
         var $51 = v.click && v1.cooldown === 0;
         if ($51) {
             return {
                 projectiles: Data_Array.snoc(newProjectiles)({
-                    position: {
-                        x: 18.0, 
-                        y: 220.0
-                    }, 
+                    position: cannonPosition, 
                     velocity: scaleV2(10.0)({
                         x: -$$Math.sin(cannonDirection), 
                         y: $$Math.cos(cannonDirection)
@@ -8997,7 +9003,7 @@ var step = function (v) {
                 })()
             };
         };
-        throw new Error("Failed pattern match at Main line 60, column 1 - line 81, column 1: " + [ $51.constructor.name ]);
+        throw new Error("Failed pattern match at Main line 66, column 1 - line 87, column 1: " + [ $51.constructor.name ]);
     };
 };
 var main = function __do() {
@@ -9028,24 +9034,26 @@ var main = function __do() {
             return Graphics_Drawing.render(v1)(renderS($68));
         }))();
     };
-    throw new Error("Failed pattern match at Main line 109, column 1 - line 122, column 39: " + [ v.constructor.name ]);
+    throw new Error("Failed pattern match at Main line 121, column 1 - line 134, column 39: " + [ v.constructor.name ]);
 };
 module.exports = {
     main: main, 
     renderProjectile: renderProjectile, 
     renderS: renderS, 
     colorFromDirection: colorFromDirection, 
+    clearCannon: clearCannon, 
     clear: clear, 
     initialState: initialState, 
     step: step, 
     move: move, 
     cull: cull, 
+    cannonPosition: cannonPosition, 
     hole: hole, 
     scaleV2: scaleV2, 
     addV2: addV2
 };
 
-},{"Color":"/home/creek/Documents/chromacannon/output/Color/index.js","Control.Monad.Eff":"/home/creek/Documents/chromacannon/output/Control.Monad.Eff/index.js","Control.Monad.Eff.Console":"/home/creek/Documents/chromacannon/output/Control.Monad.Eff.Console/index.js","Data.Array":"/home/creek/Documents/chromacannon/output/Data.Array/index.js","Data.Foldable":"/home/creek/Documents/chromacannon/output/Data.Foldable/index.js","Data.Int":"/home/creek/Documents/chromacannon/output/Data.Int/index.js","Data.Maybe":"/home/creek/Documents/chromacannon/output/Data.Maybe/index.js","Data.Monoid":"/home/creek/Documents/chromacannon/output/Data.Monoid/index.js","Data.Tuple":"/home/creek/Documents/chromacannon/output/Data.Tuple/index.js","Debug.Trace":"/home/creek/Documents/chromacannon/output/Debug.Trace/index.js","Graphics.Canvas":"/home/creek/Documents/chromacannon/output/Graphics.Canvas/index.js","Graphics.Drawing":"/home/creek/Documents/chromacannon/output/Graphics.Drawing/index.js","Math":"/home/creek/Documents/chromacannon/output/Math/index.js","Prelude":"/home/creek/Documents/chromacannon/output/Prelude/index.js","Signal":"/home/creek/Documents/chromacannon/output/Signal/index.js","Signal.DOM":"/home/creek/Documents/chromacannon/output/Signal.DOM/index.js","Signal.Time":"/home/creek/Documents/chromacannon/output/Signal.Time/index.js","Unsafe.Coerce":"/home/creek/Documents/chromacannon/output/Unsafe.Coerce/index.js"}],"/home/creek/Documents/chromacannon/output/Math/foreign.js":[function(require,module,exports){
+},{"Color":"/home/creek/Documents/chromacannon/output/Color/index.js","Control.Monad.Eff":"/home/creek/Documents/chromacannon/output/Control.Monad.Eff/index.js","Control.Monad.Eff.Console":"/home/creek/Documents/chromacannon/output/Control.Monad.Eff.Console/index.js","Data.Array":"/home/creek/Documents/chromacannon/output/Data.Array/index.js","Data.Foldable":"/home/creek/Documents/chromacannon/output/Data.Foldable/index.js","Data.Int":"/home/creek/Documents/chromacannon/output/Data.Int/index.js","Data.Maybe":"/home/creek/Documents/chromacannon/output/Data.Maybe/index.js","Data.Monoid":"/home/creek/Documents/chromacannon/output/Data.Monoid/index.js","Data.Tuple":"/home/creek/Documents/chromacannon/output/Data.Tuple/index.js","Debug.Trace":"/home/creek/Documents/chromacannon/output/Debug.Trace/index.js","Graphics.Canvas":"/home/creek/Documents/chromacannon/output/Graphics.Canvas/index.js","Graphics.Drawing":"/home/creek/Documents/chromacannon/output/Graphics.Drawing/index.js","Graphics.Drawing.Font":"/home/creek/Documents/chromacannon/output/Graphics.Drawing.Font/index.js","Math":"/home/creek/Documents/chromacannon/output/Math/index.js","Prelude":"/home/creek/Documents/chromacannon/output/Prelude/index.js","Signal":"/home/creek/Documents/chromacannon/output/Signal/index.js","Signal.DOM":"/home/creek/Documents/chromacannon/output/Signal.DOM/index.js","Signal.Time":"/home/creek/Documents/chromacannon/output/Signal.Time/index.js","Unsafe.Coerce":"/home/creek/Documents/chromacannon/output/Unsafe.Coerce/index.js"}],"/home/creek/Documents/chromacannon/output/Math/foreign.js":[function(require,module,exports){
 /* global exports */
 "use strict";
 
