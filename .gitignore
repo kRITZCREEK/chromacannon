@@ -5,5 +5,4 @@
 /.psci*
 /src/.webpack.js
 /.psa-stash
-/app.js
 /reload
