@@ -1,10 +1,6 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff
-import Control.Monad.Eff.Console
-
-import Color
 
 import Data.Array (snoc, filter, length)
 import Data.Int (toNumber)
@@ -21,22 +17,14 @@ import Graphics.Drawing.Font (font, monospace)
 
 import Math (atan2, sin, cos, max)
 
-import Signal hiding (filter)
+import Signal as Signal
 import Signal.DOM
-import Signal.Time
+import Signal.Time (Time, since, every)
 
 import Unsafe.Coerce
 
-type Vector2D = {x :: Number, y :: Number}
-
-addV2 :: Vector2D -> Vector2D -> Vector2D
-addV2 {x: x1, y: y1} {x: x2, y: y2} = {x: x1 + x2, y: y1 + y2}
-
-scaleV2 :: forall e
-           . Number
-           -> {x :: Number, y :: Number | e}
-           -> {x :: Number, y :: Number | e}
-scaleV2 s v@({x, y}) = v {x=s*x, y=s*y}
+import Vector2D as V2
+import Vector2D (Vector2D)
 
 type Projectile =
   { position :: Vector2D
@@ -61,16 +49,15 @@ cull {position: {x, y}} = x >= 0.0 && x <= 800.0 && y >= 0.0 && y <= 600.0
 move :: forall e
         . {position :: Vector2D, velocity :: Vector2D | e}
         -> {position :: Vector2D, velocity :: Vector2D | e}
-move (r@{position, velocity}) = r {position = addV2 position velocity}
+move (r@{position, velocity}) = r {position = V2.addV2 position velocity}
 
 step { deltat, click, position: {x, y} } { projectiles, cooldown } =
-  let newProjectiles =
-      map move >>> filter cull $ projectiles
+  let newProjectiles = map move >>> filter cull $ projectiles
       cannonDirection = atan2 (negate ((max cannonPosition.x x) - cannonPosition.x)) (y - cannonPosition.y)
   in
    if click && cooldown == 0
    then { projectiles: snoc newProjectiles { position: cannonPosition
-                                           , velocity: scaleV2 10.0
+                                           , velocity: V2.scaleV2 10.0
                                                 { x: negate (sin cannonDirection)
                                                 , y: cos cannonDirection
                                                 }
@@ -117,7 +104,6 @@ renderProjectile { position: {x, y}, velocity, color } =
   let c = (circle x y 20.0)
   in filled (fillColor color) c <> outlined (lineWidth 1.0) c
 
--- main :: forall e. Eff (console :: CONSOLE | e) Unit
 main = do
   Just c <- getCanvasElementById "canvas"
   ctx <- getContext2D c
@@ -130,5 +116,5 @@ main = do
                 tick <*>
                 clicks <*>
                 (pos <#> \ {x, y} -> {x: toNumber x, y: toNumber y}))
-  let state = foldp step initialState (sampleOn tick inputs)
-  runSignal $ state ~> render ctx <<< renderS
+  let state = Signal.foldp step initialState (Signal.sampleOn tick inputs)
+  Signal.runSignal $ state <#> render ctx <<< renderS
