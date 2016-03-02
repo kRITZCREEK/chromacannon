@@ -2,6 +2,10 @@ module Main where
 
 import Prelude
 
+import Control.Monad.Eff.Random
+
+import Color
+
 import Data.Array (snoc, filter, length)
 import Data.Int (toNumber)
 import Data.Foldable (any, foldMap)
@@ -46,6 +50,7 @@ type State =
   , enemyCooldown :: Int
   , cannonCooldown :: Int
   , cannonDirection :: Number
+  , cannonColor :: Color
   }
 
 hole :: forall a. a
@@ -56,14 +61,14 @@ cannonPosition = {x: 18.0, y: 280.0}
 cull :: forall e. {position :: Vector2D | e} -> Boolean
 cull {position: {x, y}} = x >= 0.0 && x <= 800.0 && y >= 0.0 && y <= 600.0
 
-newEnemy = {position: {x: 700.0, y: 200.0}, velocity: {x: negate 0.5, y: 2.0 }, color: black, hit: false}
+newEnemy c = {position: {x: 700.0, y: 200.0}, velocity: {x: negate 0.5, y: 2.0 }, color: c, hit: false}
 
-newProjectile cannonDirection =
+newProjectile cannonDirection cannonColor =
   { position: cannonPosition
   , velocity: V2.scaleV2 10.0 { x: negate (sin cannonDirection)
                               , y: cos cannonDirection
                               }
-  , color: colorFromDirection cannonDirection
+  , color: cannonColor
   , hit: false
   }
 
@@ -83,8 +88,8 @@ mark :: forall e
         . {projectiles :: Array Projectile, enemies :: Array Enemy | e}
         -> {projectiles :: Array Projectile, enemies :: Array Enemy | e}
 mark s@{projectiles, enemies} =
-  let collides {position: {x: x1, y: y1 }} {position: {x: x2, y: y2 }} =
-        Math.abs (x1 - x2) < 20.0 && Math.abs (y1 - y2) < 20.0
+  let collides {position: {x: x1, y: y1 }, color: c1} {position: {x: x2, y: y2 }, color: c2} =
+        Math.abs (x1 - x2) < 20.0 && Math.abs (y1 - y2) < 20.0 && distance c1 c2 < 50.0
   in
    s { projectiles = (\p -> p {hit = any (collides p) enemies}) <$> projectiles
      , enemies = (\e -> e {hit = any (collides e) projectiles}) <$> enemies
@@ -92,13 +97,13 @@ mark s@{projectiles, enemies} =
 
 sweep = filter (not <<< _.hit)
 
-step { deltat, click, position: {x, y} } { projectiles, enemies, enemyCooldown, cannonCooldown } =
+step { deltat, click, position: {x, y}, randomColor, cannonColor } { projectiles, enemies, enemyCooldown, cannonCooldown } =
   let newProjectiles = sweep >>> map move >>> filter cull $ projectiles
                        `append` if doesNewProjectileSpawn
-                                then [newProjectile cannonDirection] else []
+                                then [newProjectile cannonDirection cannonColor] else []
       newEnemies = (sweep >>> map (bounce >>> move) $ enemies)
                    `append` if enemyCooldown == 0
-                            then [newEnemy] else []
+                            then [newEnemy randomColor] else []
       newEnemyCooldown = if enemyCooldown == 0 then 300 else enemyCooldown - 1
       newCannonCooldown = if doesNewProjectileSpawn
                           then 10
@@ -113,9 +118,16 @@ step { deltat, click, position: {x, y} } { projectiles, enemies, enemyCooldown, 
         , enemyCooldown: newEnemyCooldown
         , cannonDirection
         , cannonCooldown: newCannonCooldown
+        , cannonColor
         }
 
-initialState = { projectiles: [], enemies: [], enemyCooldown: 0, cannonDirection: 0.0, cannonCooldown: 0}
+initialState = { projectiles: []
+               , enemies: []
+               , enemyCooldown: 0
+               , cannonDirection: 0.0
+               , cannonCooldown: 0
+               , cannonColor: white
+               }
 
 clear = filled (fillColor black) (rectangle 0.0 0.0 800.0 600.0) <> filled (fillColor white) (rectangle 10.0 10.0 780.0 580.0)
 clearCannon = translate 18.0 220.0 $ filled (fillColor white) (circle 0.0 0.0 102.5)
@@ -123,7 +135,7 @@ clearCannon = translate 18.0 220.0 $ filled (fillColor white) (circle 0.0 0.0 10
 colorFromDirection cannonDirection = hsl (360.0 * (sin cannonDirection)) 0.8 0.5
 
 renderS :: State -> Drawing
-renderS { projectiles, enemies, cannonDirection, cannonCooldown } =
+renderS { projectiles, enemies, cannonDirection, cannonCooldown, cannonColor } =
   clear
   <> shadow (shadowColor black <> shadowBlur 5.0) cannon
   <> foldMap renderProjectile projectiles
@@ -134,7 +146,7 @@ renderS { projectiles, enemies, cannonDirection, cannonCooldown } =
     infos = infoText ("Projectiles: " <> show (length projectiles))
             <> (translate 0.0 20.0 $ infoText ("CannonDirection: " <> show (cannonDirection)))
             <> (translate 0.0 40.0 $ infoText ("Enemies: " <> show (length enemies)))
-    color = fillColor (colorFromDirection cannonDirection)
+    color = fillColor cannonColor
     flash = if cannonCooldown == 0
             then filled (fillColor black) $ mempty
             else filled (fillColor black) (circle 0.0 0.0 (20.0 + 30.0 / (toNumber cannonCooldown)))
@@ -163,11 +175,20 @@ main = do
 
   -- tick <- animationFrame
   let tick = every 16.0
+      tickColor = every 500.0
+      cannonColor = _.color <$>
+        Signal.foldp
+          (\_ {counter} -> {color: hsl counter 0.5 0.5, counter: counter + 15.0})
+          {color: white, counter: 0.0}
+          tickColor
   clicks <- mouseButton 0
   pos <- mousePos
-  let inputs = ({deltat: _, click: _, position: _} <$>
+  randomColor <- Signal.unwrap (const ((\x -> hsl x 0.5 0.5) <$> randomRange 0.0 360.0) <$> tickColor)
+  let inputs = ({deltat: _, click: _, position: _, randomColor: _, cannonColor: _} <$>
                 tick <*>
                 clicks <*>
-                (pos <#> \ {x, y} -> {x: toNumber x, y: toNumber y}))
+                (pos <#> \ {x, y} -> {x: toNumber x, y: toNumber y})) <*>
+                randomColor <*>
+                cannonColor
   let state = Signal.foldp step initialState (Signal.sampleOn tick inputs)
   Signal.runSignal $ state <#> render ctx <<< renderS
