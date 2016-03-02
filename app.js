@@ -25,12 +25,43 @@ var $foreign = require("./foreign");
 var Prelude = require("Prelude");
 var Control_Bind = require("Control.Bind");
 var Data_Array = require("Data.Array");
+var Data_Foldable = require("Data.Foldable");
 var Data_Int = require("Data.Int");
+var Data_Int_Bits = require("Data.Int.Bits");
 var Data_Maybe = require("Data.Maybe");
+var Data_Maybe_Unsafe = require("Data.Maybe.Unsafe");
 var Data_Ord = require("Data.Ord");
 var Data_String = require("Data.String");
 var Data_String_Regex = require("Data.String.Regex");
 var $$Math = require("Math");
+var RGB = (function () {
+    function RGB() {
+
+    };
+    RGB.value = new RGB();
+    return RGB;
+})();
+var HSL = (function () {
+    function HSL() {
+
+    };
+    HSL.value = new HSL();
+    return HSL;
+})();
+var LCh = (function () {
+    function LCh() {
+
+    };
+    LCh.value = new LCh();
+    return LCh;
+})();
+var Lab = (function () {
+    function Lab() {
+
+    };
+    Lab.value = new Lab();
+    return Lab;
+})();
 var HSLA = (function () {
     function HSLA(value0, value1, value2, value3) {
         this.value0 = value0;
@@ -54,7 +85,7 @@ var toRGBA$prime = function (v) {
     var chr = (1.0 - $$Math.abs(2.0 * v.value2 - 1.0)) * v.value1;
     var m = v.value2 - chr / 2.0;
     var x = chr * (1.0 - $$Math.abs($$Math["%"](h$prime)(2.0) - 1.0));
-    var rgb$prime1 = (function () {
+    var col = (function () {
         if (h$prime < 1.0) {
             return {
                 r: chr, 
@@ -97,20 +128,43 @@ var toRGBA$prime = function (v) {
                 b: x
             };
         };
-        throw new Error("Failed pattern match at Color line 154, column 1 - line 167, column 1: " + [  ]);
+        throw new Error("Failed pattern match at Color line 295, column 1 - line 313, column 1: " + [  ]);
     })();
     return {
-        r: rgb$prime1.r + m, 
-        g: rgb$prime1.g + m, 
-        b: rgb$prime1.b + m, 
+        r: col.r + m, 
+        g: col.g + m, 
+        b: col.b + m, 
         a: v.value3
     };
 };
+var toXYZ = function (c) {
+    var rec = toRGBA$prime(c);
+    var finv = function (c1) {
+        if (c1 <= 4.045e-2) {
+            return c1 / 12.92;
+        };
+        if (Prelude.otherwise) {
+            return $$Math.pow((c1 + 5.500000000000001e-2) / 1.055)(2.4);
+        };
+        throw new Error("Failed pattern match at Color line 314, column 1 - line 331, column 1: " + [ c1.constructor.name ]);
+    };
+    var g = finv(rec.g);
+    var r = finv(rec.r);
+    var b = finv(rec.b);
+    var x = 0.4124 * r + 0.35760000000000003 * g + 0.18050000000000002 * b;
+    var y = 0.21259999999999998 * r + 0.7152000000000001 * g + 7.22e-2 * b;
+    var z = 1.93e-2 * r + 0.1192 * g + 0.9505000000000001 * b;
+    return {
+        x: x, 
+        y: y, 
+        z: z
+    };
+};
 var toRGBA = function (v) {
-    var rgb$prime1 = toRGBA$prime(v);
-    var r = Data_Int.round(255.0 * rgb$prime1.r);
-    var g = Data_Int.round(255.0 * rgb$prime1.g);
-    var b = Data_Int.round(255.0 * rgb$prime1.b);
+    var c = toRGBA$prime(v);
+    var g = Data_Int.round(255.0 * c.g);
+    var r = Data_Int.round(255.0 * c.r);
+    var b = Data_Int.round(255.0 * c.b);
     return {
         r: r, 
         g: g, 
@@ -130,31 +184,29 @@ var toHSLA = function (v) {
         a: v.value3
     };
 };
-var showColor = new Prelude.Show(function (v) {
-    return "hsla " + (Prelude.show(Prelude.showNumber)(v.value0) + (" " + (Prelude.show(Prelude.showNumber)(v.value1) + (" " + (Prelude.show(Prelude.showNumber)(v.value2) + (" " + Prelude.show(Prelude.showNumber)(v.value3)))))));
+var showColor = new Prelude.Show(function (c) {
+    var col = toRGBA(c);
+    return "rgba " + (Prelude.show(Prelude.showInt)(col.r) + (" " + (Prelude.show(Prelude.showInt)(col.g) + (" " + (Prelude.show(Prelude.showInt)(col.b) + (" " + Prelude.show(Prelude.showNumber)(col.a)))))));
 });
-var saturate = function (f) {
-    return function (v) {
-        var s$prime = Data_Ord.clamp(Prelude.ordNumber)(0.0)(1.0)(v.value1 + f);
-        return new HSLA(v.value0, s$prime, v.value2, v.value3);
+var modPos = function (x) {
+    return function (y) {
+        return $$Math["%"]($$Math["%"](x)(y) + y)(y);
     };
 };
-var rgba = function (red) {
-    return function (green) {
-        return function (blue) {
+var rgba = function (red$prime) {
+    return function (green$prime) {
+        return function (blue$prime) {
             return function (alpha) {
+                var red = Data_Ord.clamp(Prelude.ordInt)(0)(255)(red$prime);
                 var r = Data_Int.toNumber(red) / 255.0;
-                var modPos = function (x) {
-                    return function (y) {
-                        return $$Math["%"]($$Math["%"](x)(y) + y)(y);
-                    };
-                };
-                var minChroma = Data_Ord.min(Prelude.ordInt)(Data_Ord.min(Prelude.ordInt)(red)(green))(blue);
-                var maxChroma = Data_Ord.max(Prelude.ordInt)(Data_Ord.max(Prelude.ordInt)(red)(green))(blue);
-                var lightness = Data_Int.toNumber(maxChroma + minChroma | 0) / (255.0 * 2.0);
+                var green = Data_Ord.clamp(Prelude.ordInt)(0)(255)(green$prime);
                 var g = Data_Int.toNumber(green) / 255.0;
+                var blue = Data_Ord.clamp(Prelude.ordInt)(0)(255)(blue$prime);
+                var maxChroma = Data_Ord.max(Prelude.ordInt)(Data_Ord.max(Prelude.ordInt)(red)(green))(blue);
+                var minChroma = Data_Ord.min(Prelude.ordInt)(Data_Ord.min(Prelude.ordInt)(red)(green))(blue);
                 var chroma = maxChroma - minChroma;
                 var chroma$prime = Data_Int.toNumber(chroma) / 255.0;
+                var lightness = Data_Int.toNumber(maxChroma + minChroma | 0) / (255.0 * 2.0);
                 var saturation = (function () {
                     if (chroma === 0) {
                         return 0.0;
@@ -162,7 +214,7 @@ var rgba = function (red) {
                     if (Prelude.otherwise) {
                         return chroma$prime / (1.0 - $$Math.abs(2.0 * lightness - 1.0));
                     };
-                    throw new Error("Failed pattern match at Color line 69, column 1 - line 98, column 1: " + [  ]);
+                    throw new Error("Failed pattern match at Color line 119, column 1 - line 150, column 1: " + [  ]);
                 })();
                 var b = Data_Int.toNumber(blue) / 255.0;
                 var hue$prime = function (v) {
@@ -178,11 +230,18 @@ var rgba = function (red) {
                     if (Prelude.otherwise) {
                         return (r - g) / chroma$prime + 4.0;
                     };
-                    throw new Error("Failed pattern match at Color line 69, column 1 - line 98, column 1: " + [ v.constructor.name ]);
+                    throw new Error("Failed pattern match at Color line 119, column 1 - line 150, column 1: " + [ v.constructor.name ]);
                 };
                 var hue = 60.0 * hue$prime(chroma);
                 return new HSLA(hue, saturation, lightness, alpha);
             };
+        };
+    };
+};
+var rgb = function (r) {
+    return function (g) {
+        return function (b) {
+            return rgba(r)(g)(b)(1.0);
         };
     };
 };
@@ -202,30 +261,114 @@ var rgb$prime = function (r) {
         };
     };
 };
-var rgb = function (r) {
-    return function (g) {
+var xyz = function (x) {
+    return function (y) {
+        return function (z) {
+            var f = function (c) {
+                if (c <= 3.1307999999999996e-3) {
+                    return 12.92 * c;
+                };
+                if (Prelude.otherwise) {
+                    return 1.055 * $$Math.pow(c)(1.0 / 2.4) - 5.500000000000001e-2;
+                };
+                throw new Error("Failed pattern match at Color line 194, column 5 - line 196, column 5: " + [ c.constructor.name ]);
+            };
+            var g = f(-0.9689 * x + 1.8758 * y + 4.15e-2 * z);
+            var r = f(3.2406 * x - 1.5372 * y - 0.4986 * z);
+            var b = f((5.5700000000000006e-2 * x - 0.20400000000000001 * y) + 1.057 * z);
+            return rgb$prime(r)(g)(b);
+        };
+    };
+};
+var luminance = function (col) {
+    var val = toRGBA$prime(col);
+    var f = function (c) {
+        if (c <= 3.9279999999999995e-2) {
+            return c / 12.92;
+        };
+        if (Prelude.otherwise) {
+            return $$Math.pow((c + 5.500000000000001e-2) / 1.055)(2.4);
+        };
+        throw new Error("Failed pattern match at Color line 519, column 1 - line 535, column 1: " + [ c.constructor.name ]);
+    };
+    var g = f(val.g);
+    var r = f(val.r);
+    var b = f(val.b);
+    return 0.21259999999999998 * r + 0.7152000000000001 * g + 7.22e-2 * b;
+};
+var interpolate = function (fraction) {
+    return function (a) {
         return function (b) {
-            return rgba(r)(g)(b)(1.0);
+            return a + fraction * (b - a);
+        };
+    };
+};
+var interpolateAngle = function (fraction) {
+    return function (a) {
+        return function (b) {
+            var paths = [ {
+                from: a, 
+                to: b
+            }, {
+                from: a, 
+                to: b + 360.0
+            }, {
+                from: a + 360.0, 
+                to: b
+            } ];
+            var dist = function (v) {
+                return $$Math.abs(v.to - v.from);
+            };
+            var shortest = Data_Maybe_Unsafe.fromJust(Data_Foldable.minimumBy(Data_Foldable.foldableArray)(Data_Ord.comparing(Prelude.ordNumber)(dist))(paths));
+            return interpolate(fraction)(shortest.from)(shortest.to);
+        };
+    };
+};
+var hsla = function (h) {
+    return function (s) {
+        return function (l) {
+            return function (a) {
+                var s$prime = Data_Ord.clamp(Prelude.ordNumber)(0.0)(1.0)(s);
+                var l$prime = Data_Ord.clamp(Prelude.ordNumber)(0.0)(1.0)(l);
+                var h$prime = modPos(h)(360.0);
+                var a$prime = Data_Ord.clamp(Prelude.ordNumber)(0.0)(1.0)(a);
+                return new HSLA(h$prime, s$prime, l$prime, a$prime);
+            };
         };
     };
 };
 var lighten = function (f) {
     return function (v) {
-        var l$prime = Data_Ord.clamp(Prelude.ordNumber)(0.0)(1.0)(v.value2 + f);
-        return new HSLA(v.value0, v.value1, l$prime, v.value3);
+        return hsla(v.value0)(v.value1)(v.value2 + f)(v.value3);
     };
 };
-var hsla = HSLA.create;
+var rotateHue = function (angle) {
+    return function (v) {
+        return hsla(v.value0 + angle)(v.value1)(v.value2)(v.value3);
+    };
+};
+var saturate = function (f) {
+    return function (v) {
+        return hsla(v.value0)(v.value1 + f)(v.value2)(v.value3);
+    };
+};
 var hsl = function (h) {
     return function (s) {
         return function (l) {
-            return new HSLA(h, s, l, 1.0);
+            return hsla(h)(s)(l)(1.0);
         };
     };
 };
 var white = hsl(0.0)(0.0)(1.0);
-var grayscale = function (l) {
+var graytone = function (l) {
     return hsl(0.0)(0.0)(l);
+};
+var fromInt = function (m) {
+    var n = Data_Ord.clamp(Prelude.ordInt)(0)(16777215)(m);
+    var r = n >> 16 & 255;
+    var g = n >> 8 & 255;
+    var b = n & 255;
+    return rgb(r)(g)(b);
 };
 var fromHexString = function (str) {
     var isShort = Data_String.length(str) === 4;
@@ -238,7 +381,7 @@ var fromHexString = function (str) {
         if (!isShort) {
             return pair + (pair + pair);
         };
-        throw new Error("Failed pattern match at Color line 188, column 15 - line 191, column 5: " + [ isShort.constructor.name ]);
+        throw new Error("Failed pattern match at Color line 257, column 15 - line 260, column 5: " + [ isShort.constructor.name ]);
     })();
     var pattern = Data_String_Regex.regex("^#(?:" + (variant + ")$"))(Data_String_Regex.parseFlags("i"));
     return Prelude.bind(Data_Maybe.bindMaybe)(Data_String_Regex.match(pattern)(str))(function (v) {
@@ -251,26 +394,17 @@ var fromHexString = function (str) {
                     if (!isShort) {
                         return Prelude.pure(Data_Maybe.applicativeMaybe)(rgb(v1)(v2)(v3));
                     };
-                    throw new Error("Failed pattern match at Color line 178, column 3 - line 183, column 3: " + [ isShort.constructor.name ]);
+                    throw new Error("Failed pattern match at Color line 247, column 3 - line 252, column 3: " + [ isShort.constructor.name ]);
                 });
             });
         });
     });
 };
-var eqColor = new Prelude.Eq(function (v) {
-    return function (v1) {
-        var approxEqDegree = function (d1) {
-            return function (d2) {
-                var diff = $$Math.abs(d1 - d2);
-                return diff < 1.5 || 360.0 - diff < 1.5;
-            };
-        };
-        var approxEq = function (v11) {
-            return function (v2) {
-                return $$Math.abs(v11 - v2) < 1.0e-2;
-            };
-        };
-        return approxEqDegree(v.value0)(v1.value0) && (approxEq(v.value1)(v1.value1) && (approxEq(v.value2)(v1.value2) && approxEq(v.value3)(v1.value3)));
+var eqColor = new Prelude.Eq(function (c1) {
+    return function (c2) {
+        var rgb2 = toRGBA(c2);
+        var rgb1 = toRGBA(c1);
+        return rgb1.r === rgb2.r && (rgb1.g === rgb2.g && (rgb1.b === rgb2.b && rgb1.a === rgb2.a));
     };
 });
 var desaturate = function (f) {
@@ -278,6 +412,133 @@ var desaturate = function (f) {
 };
 var darken = function (f) {
     return lighten(-f);
+};
+var d65 = {
+    xn: 0.9504699999999999, 
+    yn: 1.0, 
+    zn: 1.08883
+};
+var lab = function (l) {
+    return function (a) {
+        return function (b) {
+            var l$prime = (l + 16.0) / 116.0;
+            var delta = 6.0 / 29.0;
+            var finv = function (t) {
+                if (t > delta) {
+                    return $$Math.pow(t)(3.0);
+                };
+                if (Prelude.otherwise) {
+                    return 3.0 * delta * delta * (t - 4.0 / 29.0);
+                };
+                throw new Error("Failed pattern match at Color line 213, column 1 - line 229, column 1: " + [ t.constructor.name ]);
+            };
+            var x = d65.xn * finv(l$prime + a / 500.0);
+            var y = d65.yn * finv(l$prime);
+            var z = d65.zn * finv(l$prime - b / 200.0);
+            return xyz(x)(y)(z);
+        };
+    };
+};
+var lch = function (l) {
+    return function (c) {
+        return function (h) {
+            var deg2rad = $$Math.pi / 180.0;
+            var b = c * $$Math.sin(h * deg2rad);
+            var a = c * $$Math.cos(h * deg2rad);
+            return lab(l)(a)(b);
+        };
+    };
+};
+var toLab = function (col) {
+    var rec = toXYZ(col);
+    var cut = $$Math.pow(6.0 / 29.0)(3.0);
+    var f = function (t) {
+        if (t > cut) {
+            return $$Math.pow(t)(1.0 / 3.0);
+        };
+        if (Prelude.otherwise) {
+            return (1.0 / 3.0) * $$Math.pow(29.0 / 6.0)(2.0) * t + 4.0 / 29.0;
+        };
+        throw new Error("Failed pattern match at Color line 332, column 1 - line 349, column 1: " + [ t.constructor.name ]);
+    };
+    var fy = f(rec.y / d65.yn);
+    var l = 116.0 * fy - 16.0;
+    var b = 200.0 * (fy - f(rec.z / d65.zn));
+    var a = 500.0 * (f(rec.x / d65.xn) - fy);
+    return {
+        l: l, 
+        a: a, 
+        b: b
+    };
+};
+var distance = function (col1) {
+    return function (col2) {
+        var sq = function (x) {
+            return $$Math.pow(x)(2.0);
+        };
+        var c2 = toLab(col2);
+        var c1 = toLab(col1);
+        return $$Math.sqrt(sq(c1.l - c2.l) + sq(c1.a - c2.a) + sq(c1.b - c2.b));
+    };
+};
+var toLCh = function (col) {
+    var rec = toLab(col);
+    var rad2deg = 180.0 / $$Math.pi;
+    var c = $$Math.sqrt(rec.a * rec.a + rec.b * rec.b);
+    var h = modPos($$Math.atan2(rec.b)(rec.a) * rad2deg)(360.0);
+    return {
+        l: rec.l, 
+        c: c, 
+        h: h
+    };
+};
+var mix = function (v) {
+    return function (c1) {
+        return function (c2) {
+            return function (frac) {
+                if (v instanceof HSL) {
+                    var t = toHSLA(c2);
+                    var f = toHSLA(c1);
+                    return hsla(interpolateAngle(frac)(f.h)(t.h))(interpolate(frac)(f.s)(t.s))(interpolate(frac)(f.l)(t.l))(interpolate(frac)(f.a)(t.a));
+                };
+                if (v instanceof RGB) {
+                    var t = toRGBA$prime(c2);
+                    var f = toRGBA$prime(c1);
+                    return rgba$prime(interpolate(frac)(f.r)(t.r))(interpolate(frac)(f.g)(t.g))(interpolate(frac)(f.b)(t.b))(interpolate(frac)(f.a)(t.a));
+                };
+                if (v instanceof LCh) {
+                    var t = toLCh(c2);
+                    var f = toLCh(c1);
+                    return lch(interpolate(frac)(f.l)(t.l))(interpolate(frac)(f.c)(t.c))(interpolateAngle(frac)(f.h)(t.h));
+                };
+                if (v instanceof Lab) {
+                    var t = toLab(c2);
+                    var f = toLab(c1);
+                    return lab(interpolate(frac)(f.l)(t.l))(interpolate(frac)(f.a)(t.a))(interpolate(frac)(f.b)(t.b));
+                };
+                throw new Error("Failed pattern match at Color line 473, column 1 - line 482, column 1: " + [ v.constructor.name, c1.constructor.name, c2.constructor.name, frac.constructor.name ]);
+            };
+        };
+    };
+};
+var toGray = function (col) {
+    var res = toLCh(col);
+    return desaturate(1.0)(lch(res.l)(0.0)(0.0));
+};
+var cssStringRGBA = function (col) {
+    var c = toRGBA(col);
+    var green = Prelude.show(Prelude.showInt)(c.g);
+    var red = Prelude.show(Prelude.showInt)(c.r);
+    var blue = Prelude.show(Prelude.showInt)(c.b);
+    var alpha = Prelude.show(Prelude.showNumber)(c.a);
+    var $66 = c.a === 1.0;
+    if ($66) {
+        return "rgb(" + (red + (", " + (green + (", " + (blue + ")")))));
+    };
+    if (!$66) {
+        return "rgba(" + (red + (", " + (green + (", " + (blue + (", " + (alpha + ")")))))));
+    };
+    throw new Error("Failed pattern match at Color line 390, column 3 - line 394, column 3: " + [ $66.constructor.name ]);
 };
 var cssStringHSLA = function (v) {
     var toString = function (n) {
@@ -287,44 +548,89 @@ var cssStringHSLA = function (v) {
     var lightness = toString(v.value2 * 100.0) + "%";
     var hue = toString(v.value0);
     var alpha = Prelude.show(Prelude.showNumber)(v.value3);
-    var $65 = v.value3 === 1.0;
-    if ($65) {
+    var $68 = v.value3 === 1.0;
+    if ($68) {
         return "hsl(" + (hue + (", " + (saturation + (", " + (lightness + ")")))));
     };
-    if (!$65) {
+    if (!$68) {
         return "hsla(" + (hue + (", " + (saturation + (", " + (lightness + (", " + (alpha + ")")))))));
     };
-    throw new Error("Failed pattern match at Color line 206, column 3 - line 210, column 3: " + [ $65.constructor.name ]);
+    throw new Error("Failed pattern match at Color line 376, column 3 - line 380, column 3: " + [ $68.constructor.name ]);
 };
-var complementary = function (v) {
-    var h$prime = $$Math["%"](v.value0 + 180.0)(360.0);
-    return new HSLA(h$prime, v.value1, v.value2, v.value3);
+var contrast = function (c1) {
+    return function (c2) {
+        var l2 = luminance(c2);
+        var l1 = luminance(c1);
+        var $73 = l1 > l2;
+        if ($73) {
+            return (l1 + 5.0e-2) / (l2 + 5.0e-2);
+        };
+        if (!$73) {
+            return (l2 + 5.0e-2) / (l1 + 5.0e-2);
+        };
+        throw new Error("Failed pattern match at Color line 536, column 18 - line 539, column 3: " + [ $73.constructor.name ]);
+    };
 };
+var isReadable = function (c1) {
+    return function (c2) {
+        return contrast(c1)(c2) > 4.5;
+    };
+};
+var complementary = rotateHue(180.0);
 var brightness = function (col) {
-    var rgb1 = toRGBA$prime(col);
-    return (299.0 * rgb1.r + 587.0 * rgb1.g + 114.0 * rgb1.b) / 1000.0;
+    var c = toRGBA$prime(col);
+    return (299.0 * c.r + 587.0 * c.g + 114.0 * c.b) / 1000.0;
 };
 var isLight = function (c) {
     return brightness(c) > 0.5;
 };
 var black = hsl(0.0)(0.0)(0.0);
+var textColor = function (c) {
+    if (isLight(c)) {
+        return black;
+    };
+    if (Prelude.otherwise) {
+        return white;
+    };
+    throw new Error("Failed pattern match at Color line 564, column 1 - line 571, column 1: " + [ c.constructor.name ]);
+};
 module.exports = {
+    RGB: RGB, 
+    HSL: HSL, 
+    LCh: LCh, 
+    Lab: Lab, 
+    distance: distance, 
+    textColor: textColor, 
+    isReadable: isReadable, 
     isLight: isLight, 
+    contrast: contrast, 
+    luminance: luminance, 
     brightness: brightness, 
+    mix: mix, 
+    toGray: toGray, 
     desaturate: desaturate, 
     saturate: saturate, 
     darken: darken, 
     lighten: lighten, 
     complementary: complementary, 
+    rotateHue: rotateHue, 
+    graytone: graytone, 
+    white: white, 
+    black: black, 
+    cssStringRGBA: cssStringRGBA, 
     cssStringHSLA: cssStringHSLA, 
     toHexString: toHexString, 
-    fromHexString: fromHexString, 
+    toLCh: toLCh, 
+    toLab: toLab, 
+    toXYZ: toXYZ, 
     "toRGBA'": toRGBA$prime, 
     toRGBA: toRGBA, 
     toHSLA: toHSLA, 
-    grayscale: grayscale, 
-    white: white, 
-    black: black, 
+    fromInt: fromInt, 
+    fromHexString: fromHexString, 
+    lch: lch, 
+    lab: lab, 
+    xyz: xyz, 
     hsl: hsl, 
     hsla: hsla, 
     "rgb'": rgb$prime, 
@@ -335,7 +641,7 @@ module.exports = {
     eqColor: eqColor
 };
 
-},{"./foreign":"/home/creek/Documents/chromacannon/output/Color/foreign.js","Control.Bind":"/home/creek/Documents/chromacannon/output/Control.Bind/index.js","Data.Array":"/home/creek/Documents/chromacannon/output/Data.Array/index.js","Data.Int":"/home/creek/Documents/chromacannon/output/Data.Int/index.js","Data.Maybe":"/home/creek/Documents/chromacannon/output/Data.Maybe/index.js","Data.Ord":"/home/creek/Documents/chromacannon/output/Data.Ord/index.js","Data.String":"/home/creek/Documents/chromacannon/output/Data.String/index.js","Data.String.Regex":"/home/creek/Documents/chromacannon/output/Data.String.Regex/index.js","Math":"/home/creek/Documents/chromacannon/output/Math/index.js","Prelude":"/home/creek/Documents/chromacannon/output/Prelude/index.js"}],"/home/creek/Documents/chromacannon/output/Control.Alt/index.js":[function(require,module,exports){
+},{"./foreign":"/home/creek/Documents/chromacannon/output/Color/foreign.js","Control.Bind":"/home/creek/Documents/chromacannon/output/Control.Bind/index.js","Data.Array":"/home/creek/Documents/chromacannon/output/Data.Array/index.js","Data.Foldable":"/home/creek/Documents/chromacannon/output/Data.Foldable/index.js","Data.Int":"/home/creek/Documents/chromacannon/output/Data.Int/index.js","Data.Int.Bits":"/home/creek/Documents/chromacannon/output/Data.Int.Bits/index.js","Data.Maybe":"/home/creek/Documents/chromacannon/output/Data.Maybe/index.js","Data.Maybe.Unsafe":"/home/creek/Documents/chromacannon/output/Data.Maybe.Unsafe/index.js","Data.Ord":"/home/creek/Documents/chromacannon/output/Data.Ord/index.js","Data.String":"/home/creek/Documents/chromacannon/output/Data.String/index.js","Data.String.Regex":"/home/creek/Documents/chromacannon/output/Data.String.Regex/index.js","Math":"/home/creek/Documents/chromacannon/output/Math/index.js","Prelude":"/home/creek/Documents/chromacannon/output/Prelude/index.js"}],"/home/creek/Documents/chromacannon/output/Control.Alt/index.js":[function(require,module,exports){
 // Generated by psc version 0.8.2.0
 "use strict";
 var Prelude = require("Prelude");
@@ -787,7 +1093,49 @@ module.exports = {
     error: $foreign.error
 };
 
-},{"./foreign":"/home/creek/Documents/chromacannon/output/Control.Monad.Eff.Exception/foreign.js","Control.Monad.Eff":"/home/creek/Documents/chromacannon/output/Control.Monad.Eff/index.js","Data.Maybe":"/home/creek/Documents/chromacannon/output/Data.Maybe/index.js","Prelude":"/home/creek/Documents/chromacannon/output/Prelude/index.js"}],"/home/creek/Documents/chromacannon/output/Control.Monad.Eff.Unsafe/foreign.js":[function(require,module,exports){
+},{"./foreign":"/home/creek/Documents/chromacannon/output/Control.Monad.Eff.Exception/foreign.js","Control.Monad.Eff":"/home/creek/Documents/chromacannon/output/Control.Monad.Eff/index.js","Data.Maybe":"/home/creek/Documents/chromacannon/output/Data.Maybe/index.js","Prelude":"/home/creek/Documents/chromacannon/output/Prelude/index.js"}],"/home/creek/Documents/chromacannon/output/Control.Monad.Eff.Random/foreign.js":[function(require,module,exports){
+/* global exports */
+"use strict";
+
+// module Control.Monad.Eff.Random
+
+exports.random = Math.random;
+
+},{}],"/home/creek/Documents/chromacannon/output/Control.Monad.Eff.Random/index.js":[function(require,module,exports){
+// Generated by psc version 0.8.2.0
+"use strict";
+var $foreign = require("./foreign");
+var Prelude = require("Prelude");
+var Control_Monad_Eff = require("Control.Monad.Eff");
+var Data_Int = require("Data.Int");
+var randomRange = function (min) {
+    return function (max) {
+        return function __do() {
+            var v = $foreign.random();
+            return v * (max - min) + min;
+        };
+    };
+};
+var randomInt = function (low) {
+    return function (high) {
+        return function __do() {
+            var v = $foreign.random();
+            var asNumber = ((Data_Int.toNumber(high) - Data_Int.toNumber(low)) + 1) * v + Data_Int.toNumber(low);
+            return Data_Int.floor(asNumber);
+        };
+    };
+};
+var randomBool = Prelude["<$>"](Control_Monad_Eff.functorEff)(function (v) {
+    return v < 0.5;
+})($foreign.random);
+module.exports = {
+    randomBool: randomBool, 
+    randomRange: randomRange, 
+    randomInt: randomInt, 
+    random: $foreign.random
+};
+
+},{"./foreign":"/home/creek/Documents/chromacannon/output/Control.Monad.Eff.Random/foreign.js","Control.Monad.Eff":"/home/creek/Documents/chromacannon/output/Control.Monad.Eff/index.js","Data.Int":"/home/creek/Documents/chromacannon/output/Data.Int/index.js","Prelude":"/home/creek/Documents/chromacannon/output/Prelude/index.js"}],"/home/creek/Documents/chromacannon/output/Control.Monad.Eff.Unsafe/foreign.js":[function(require,module,exports){
 /* global exports */
 "use strict";
 
@@ -1841,7 +2189,9 @@ module.exports = {
     range: $foreign.range
 };
 
-},{"./foreign":"/home/creek/Documents/chromacannon/output/Data.Array/foreign.js","Control.Alt":"/home/creek/Documents/chromacannon/output/Control.Alt/index.js","Control.Alternative":"/home/creek/Documents/chromacannon/output/Control.Alternative/index.js","Control.Lazy":"/home/creek/Documents/chromacannon/output/Control.Lazy/index.js","Control.MonadPlus":"/home/creek/Documents/chromacannon/output/Control.MonadPlus/index.js","Control.Plus":"/home/creek/Documents/chromacannon/output/Control.Plus/index.js","Data.Foldable":"/home/creek/Documents/chromacannon/output/Data.Foldable/index.js","Data.Functor.Invariant":"/home/creek/Documents/chromacannon/output/Data.Functor.Invariant/index.js","Data.Maybe":"/home/creek/Documents/chromacannon/output/Data.Maybe/index.js","Data.Maybe.Unsafe":"/home/creek/Documents/chromacannon/output/Data.Maybe.Unsafe/index.js","Data.Monoid":"/home/creek/Documents/chromacannon/output/Data.Monoid/index.js","Data.Traversable":"/home/creek/Documents/chromacannon/output/Data.Traversable/index.js","Data.Tuple":"/home/creek/Documents/chromacannon/output/Data.Tuple/index.js","Prelude":"/home/creek/Documents/chromacannon/output/Prelude/index.js"}],"/home/creek/Documents/chromacannon/output/Data.Bifoldable/index.js":[function(require,module,exports){
+},{"./foreign":"/home/creek/Documents/chromacannon/output/Data.Array/foreign.js","Control.Alt":"/home/creek/Documents/chromacannon/output/Control.Alt/index.js","Control.Alternative":"/home/creek/Documents/chromacannon/output/Control.Alternative/index.js","Control.Lazy":"/home/creek/Documents/chromacannon/output/Control.Lazy/index.js","Control.MonadPlus":"/home/creek/Documents/chromacannon/output/Control.MonadPlus/index.js","Control.Plus":"/home/creek/Documents/chromacannon/output/Control.Plus/index.js","Data.Foldable":"/home/creek/Documents/chromacannon/output/Data.Foldable/index.js","Data.Functor.Invariant":"/home/creek/Documents/chromacannon/output/Data.Functor.Invariant/index.js","Data.Maybe":"/home/creek/Documents/chromacannon/output/Data.Maybe/index.js","Data.Maybe.Unsafe":"/home/creek/Documents/chromacannon/output/Data.Maybe.Unsafe/index.js","Data.Monoid":"/home/creek/Documents/chromacannon/output/Data.Monoid/index.js","Data.Traversable":"/home/creek/Documents/chromacannon/output/Data.Traversable/index.js","Data.Tuple":"/home/creek/Documents/chromacannon/output/Data.Tuple/index.js","Prelude":"/home/creek/Documents/chromacannon/output/Prelude/index.js"}],"/home/creek/Documents/chromacannon/output/Data.ArrayBuffer.Types/index.js":[function(require,module,exports){
+arguments[4]["/home/creek/Documents/chromacannon/output/Control.Timer/index.js"][0].apply(exports,arguments)
+},{}],"/home/creek/Documents/chromacannon/output/Data.Bifoldable/index.js":[function(require,module,exports){
 // Generated by psc version 0.8.2.0
 "use strict";
 var Prelude = require("Prelude");
@@ -7604,24 +7954,6 @@ exports.createImageDataCopy = function(ctx) {
     };
 };
 
-exports.getImageDataWidth = function(image_data) {
-    return function() {
-        return image_data.width;
-    };
-};
-
-exports.getImageDataHeight = function(image_data) {
-    return function() {
-        return image_data.height;
-    };
-};
-
-exports.getImageDataPixelArray = function(image_data) {
-    return function() {
-        return image_data.data;
-    };
-};
-
 exports.drawImage = function(ctx) {
     return function(image_source) {
         return function(dx) {
@@ -7737,6 +8069,7 @@ exports.bezierCurveTo = function(bCurve) {
 "use strict";
 var $foreign = require("./foreign");
 var Prelude = require("Prelude");
+var Data_ArrayBuffer_Types = require("Data.ArrayBuffer.Types");
 var Data_Function = require("Data.Function");
 var Data_Maybe = require("Data.Maybe");
 var Control_Monad_Eff = require("Control.Monad.Eff");
@@ -7931,7 +8264,7 @@ var showTextAlign = new Prelude.Show(function (v) {
     if (v instanceof AlignEnd) {
         return "end";
     };
-    throw new Error("Failed pattern match at Graphics.Canvas line 389, column 3 - line 390, column 3: " + [ v.constructor.name ]);
+    throw new Error("Failed pattern match at Graphics.Canvas line 383, column 3 - line 384, column 3: " + [ v.constructor.name ]);
 });
 var showComposite = new Prelude.Show(function (v) {
     if (v instanceof SourceOver) {
@@ -7967,7 +8300,7 @@ var showComposite = new Prelude.Show(function (v) {
     if (v instanceof Xor) {
         return "xor";
     };
-    throw new Error("Failed pattern match at Graphics.Canvas line 229, column 3 - line 230, column 3: " + [ v.constructor.name ]);
+    throw new Error("Failed pattern match at Graphics.Canvas line 223, column 3 - line 224, column 3: " + [ v.constructor.name ]);
 });
 var setTextAlign = function (ctx) {
     return function (textalign) {
@@ -7984,7 +8317,7 @@ var setLineCap = function (v) {
     if (v instanceof Butt) {
         return $foreign.setLineCapImpl("butt");
     };
-    throw new Error("Failed pattern match at Graphics.Canvas line 210, column 1 - line 211, column 1: " + [ v.constructor.name ]);
+    throw new Error("Failed pattern match at Graphics.Canvas line 204, column 1 - line 205, column 1: " + [ v.constructor.name ]);
 };
 var setGlobalCompositeOperation = function (ctx) {
     return function (composite) {
@@ -8065,9 +8398,6 @@ module.exports = {
     createImageData: $foreign.createImageData, 
     putImageDataFull: $foreign.putImageDataFull, 
     putImageData: $foreign.putImageData, 
-    getImageDataPixelArray: $foreign.getImageDataPixelArray, 
-    getImageDataHeight: $foreign.getImageDataHeight, 
-    getImageDataWidth: $foreign.getImageDataWidth, 
     getImageData: $foreign.getImageData, 
     withImage: $foreign.withImage, 
     restore: $foreign.restore, 
@@ -8109,7 +8439,7 @@ module.exports = {
     getContext2D: $foreign.getContext2D
 };
 
-},{"./foreign":"/home/creek/Documents/chromacannon/output/Graphics.Canvas/foreign.js","Control.Monad.Eff":"/home/creek/Documents/chromacannon/output/Control.Monad.Eff/index.js","Control.Monad.Eff.Exception.Unsafe":"/home/creek/Documents/chromacannon/output/Control.Monad.Eff.Exception.Unsafe/index.js","Data.Function":"/home/creek/Documents/chromacannon/output/Data.Function/index.js","Data.Maybe":"/home/creek/Documents/chromacannon/output/Data.Maybe/index.js","Prelude":"/home/creek/Documents/chromacannon/output/Prelude/index.js"}],"/home/creek/Documents/chromacannon/output/Graphics.Drawing.Font/index.js":[function(require,module,exports){
+},{"./foreign":"/home/creek/Documents/chromacannon/output/Graphics.Canvas/foreign.js","Control.Monad.Eff":"/home/creek/Documents/chromacannon/output/Control.Monad.Eff/index.js","Control.Monad.Eff.Exception.Unsafe":"/home/creek/Documents/chromacannon/output/Control.Monad.Eff.Exception.Unsafe/index.js","Data.ArrayBuffer.Types":"/home/creek/Documents/chromacannon/output/Data.ArrayBuffer.Types/index.js","Data.Function":"/home/creek/Documents/chromacannon/output/Data.Function/index.js","Data.Maybe":"/home/creek/Documents/chromacannon/output/Data.Maybe/index.js","Prelude":"/home/creek/Documents/chromacannon/output/Prelude/index.js"}],"/home/creek/Documents/chromacannon/output/Graphics.Drawing.Font/index.js":[function(require,module,exports){
 // Generated by psc version 0.8.2.0
 "use strict";
 var Prelude = require("Prelude");
@@ -8843,6 +9173,8 @@ module.exports = {
 // Generated by psc version 0.8.2.0
 "use strict";
 var Prelude = require("Prelude");
+var Control_Monad_Eff_Random = require("Control.Monad.Eff.Random");
+var Color = require("Color");
 var Data_Array = require("Data.Array");
 var Data_Int = require("Data.Int");
 var Data_Foldable = require("Data.Foldable");
@@ -8860,12 +9192,11 @@ var Signal_Time = require("Signal.Time");
 var Unsafe_Coerce = require("Unsafe.Coerce");
 var Vector2D_1 = require("Vector2D");
 var Vector2D_1 = require("Vector2D");
-var Color = require("Color");
 var Control_Monad_Eff = require("Control.Monad.Eff");
-var sweep = Data_Array.filter(function ($97) {
+var sweep = Data_Array.filter(function ($112) {
     return !(function (v) {
         return v.hit;
-    })($97);
+    })($112);
 });
 var renderProjectile = function (v) {
     var c = Graphics_Drawing.circle(v.position.x)(v.position.y)(20.0);
@@ -8875,68 +9206,71 @@ var renderEnemy = function (v) {
     var c = Graphics_Drawing.circle(v.position.x)(v.position.y)(30.0);
     return Graphics_Drawing.filled(Graphics_Drawing.fillColor(v.color))(c);
 };
-var newEnemy = {
-    position: {
-        x: 700.0, 
-        y: 200.0
-    }, 
-    velocity: {
-        x: -0.5, 
-        y: 2.0
-    }, 
-    color: Color.black, 
-    hit: false
+var newEnemy = function (c) {
+    return {
+        position: {
+            x: 700.0, 
+            y: 200.0
+        }, 
+        velocity: {
+            x: -0.5, 
+            y: 2.0
+        }, 
+        color: c, 
+        hit: false
+    };
 };
 var move = function (v) {
-    var $33 = {};
-    for (var $34 in v) {
-        if (v.hasOwnProperty($34)) {
-            $33[$34] = v[$34];
+    var $39 = {};
+    for (var $40 in v) {
+        if (v.hasOwnProperty($40)) {
+            $39[$40] = v[$40];
         };
     };
-    $33.position = Vector2D_1.addV2(v.position)(v.velocity);
-    return $33;
+    $39.position = Vector2D_1.addV2(v.position)(v.velocity);
+    return $39;
 };
 var mark = function (v) {
     var collides = function (v1) {
         return function (v2) {
-            return $$Math.abs(v1.position.x - v2.position.x) < 20.0 && $$Math.abs(v1.position.y - v2.position.y) < 20.0;
+            return $$Math.abs(v1.position.x - v2.position.x) < 20.0 && ($$Math.abs(v1.position.y - v2.position.y) < 20.0 && Color.distance(v1.color)(v2.color) < 50.0);
         };
     };
-    var $50 = {};
-    for (var $51 in v) {
-        if (v.hasOwnProperty($51)) {
-            $50[$51] = v[$51];
+    var $58 = {};
+    for (var $59 in v) {
+        if (v.hasOwnProperty($59)) {
+            $58[$59] = v[$59];
         };
     };
-    $50.projectiles = Prelude["<$>"](Prelude.functorArray)(function (p) {
-        var $46 = {};
-        for (var $47 in p) {
-            if (p.hasOwnProperty($47)) {
-                $46[$47] = p[$47];
+    $58.projectiles = Prelude["<$>"](Prelude.functorArray)(function (p) {
+        var $54 = {};
+        for (var $55 in p) {
+            if (p.hasOwnProperty($55)) {
+                $54[$55] = p[$55];
             };
         };
-        $46.hit = Data_Foldable.any(Data_Foldable.foldableArray)(Prelude.booleanAlgebraBoolean)(collides(p))(v.enemies);
-        return $46;
+        $54.hit = Data_Foldable.any(Data_Foldable.foldableArray)(Prelude.booleanAlgebraBoolean)(collides(p))(v.enemies);
+        return $54;
     })(v.projectiles);
-    $50.enemies = Prelude["<$>"](Prelude.functorArray)(function (e) {
-        var $48 = {};
-        for (var $49 in e) {
-            if (e.hasOwnProperty($49)) {
-                $48[$49] = e[$49];
+    $58.enemies = Prelude["<$>"](Prelude.functorArray)(function (e) {
+        var $56 = {};
+        for (var $57 in e) {
+            if (e.hasOwnProperty($57)) {
+                $56[$57] = e[$57];
             };
         };
-        $48.hit = Data_Foldable.any(Data_Foldable.foldableArray)(Prelude.booleanAlgebraBoolean)(collides(e))(v.projectiles);
-        return $48;
+        $56.hit = Data_Foldable.any(Data_Foldable.foldableArray)(Prelude.booleanAlgebraBoolean)(collides(e))(v.projectiles);
+        return $56;
     })(v.enemies);
-    return $50;
+    return $58;
 };
 var initialState = {
     projectiles: [  ], 
     enemies: [  ], 
     enemyCooldown: 0, 
     cannonDirection: 0.0, 
-    cannonCooldown: 0
+    cannonCooldown: 0, 
+    cannonColor: Color.white
 };
 var hole = Unsafe_Coerce.unsafeCoerce(Prelude.unit);
 var cull = function (v) {
@@ -8952,82 +9286,84 @@ var cannonPosition = {
     y: 280.0
 };
 var newProjectile = function (cannonDirection) {
-    return {
-        position: cannonPosition, 
-        velocity: Vector2D_1.scaleV2(10.0)({
-            x: -$$Math.sin(cannonDirection), 
-            y: $$Math.cos(cannonDirection)
-        }), 
-        color: colorFromDirection(cannonDirection), 
-        hit: false
+    return function (cannonColor) {
+        return {
+            position: cannonPosition, 
+            velocity: Vector2D_1.scaleV2(10.0)({
+                x: -$$Math.sin(cannonDirection), 
+                y: $$Math.cos(cannonDirection)
+            }), 
+            color: cannonColor, 
+            hit: false
+        };
     };
 };
 var renderS = function (v) {
     var infoText = Graphics_Drawing.text(Graphics_Drawing_Font.font(Graphics_Drawing_Font.monospace)(16)(Data_Monoid.mempty(Graphics_Drawing_Font.monoidFontOptions)))(100.0)(30.0)(Graphics_Drawing.fillColor(Color.black));
     var infos = Prelude["<>"](Graphics_Drawing.semigroupDrawing)(infoText("Projectiles: " + Prelude.show(Prelude.showInt)(Data_Array.length(v.projectiles))))(Prelude["<>"](Graphics_Drawing.semigroupDrawing)(Graphics_Drawing.translate(0.0)(20.0)(infoText("CannonDirection: " + Prelude.show(Prelude.showNumber)(v.cannonDirection))))(Graphics_Drawing.translate(0.0)(40.0)(infoText("Enemies: " + Prelude.show(Prelude.showInt)(Data_Array.length(v.enemies))))));
     var flash = (function () {
-        var $59 = v.cannonCooldown === 0;
-        if ($59) {
+        var $67 = v.cannonCooldown === 0;
+        if ($67) {
             return Graphics_Drawing.filled(Graphics_Drawing.fillColor(Color.black))(Data_Monoid.mempty(Graphics_Drawing.monoidShape));
         };
-        if (!$59) {
+        if (!$67) {
             return Prelude["<>"](Graphics_Drawing.semigroupDrawing)(Graphics_Drawing.filled(Graphics_Drawing.fillColor(Color.black))(Graphics_Drawing.circle(0.0)(0.0)(20.0 + 30.0 / Data_Int.toNumber(v.cannonCooldown))))(Graphics_Drawing.filled(Graphics_Drawing.fillColor(Color.white))(Graphics_Drawing.circle(0.0)(0.0)(10.0 + 30.0 / Data_Int.toNumber(v.cannonCooldown))));
         };
-        throw new Error("Failed pattern match at Main line 138, column 13 - line 142, column 5: " + [ $59.constructor.name ]);
+        throw new Error("Failed pattern match at Main line 150, column 13 - line 154, column 5: " + [ $67.constructor.name ]);
     })();
-    var color = Graphics_Drawing.fillColor(colorFromDirection(v.cannonDirection));
+    var color = Graphics_Drawing.fillColor(v.cannonColor);
     var cannon = Graphics_Drawing.translate(cannonPosition.x)(cannonPosition.y)(Graphics_Drawing.rotate(v.cannonDirection)(Prelude["<>"](Graphics_Drawing.semigroupDrawing)(Graphics_Drawing.translate(-10.0)(0.0)(Graphics_Drawing.filled(color)(Graphics_Drawing.rectangle(0.0)(0.0)(20.0)(100.0))))(Prelude["<>"](Graphics_Drawing.semigroupDrawing)(Graphics_Drawing.translate(-10.0)(0.0)(Graphics_Drawing.outlined(Prelude["<>"](Graphics_Drawing.semigroupOutlineStyle)(Graphics_Drawing.outlineColor(Color.black))(Graphics_Drawing.lineWidth(3.0)))(Graphics_Drawing.rectangle(0.0)(0.0)(20.0)(100.0))))(Prelude["<>"](Graphics_Drawing.semigroupDrawing)(Graphics_Drawing.filled(color)(Graphics_Drawing.circle(0.0)(0.0)(15.0)))(Prelude["<>"](Graphics_Drawing.semigroupDrawing)(Graphics_Drawing.outlined(Prelude["<>"](Graphics_Drawing.semigroupOutlineStyle)(Graphics_Drawing.outlineColor(Color.black))(Graphics_Drawing.lineWidth(3.0)))(Graphics_Drawing.circle(0.0)(0.0)(15.0)))(flash))))));
     return Prelude["<>"](Graphics_Drawing.semigroupDrawing)(clear)(Prelude["<>"](Graphics_Drawing.semigroupDrawing)(Graphics_Drawing.shadow(Prelude["<>"](Graphics_Drawing.semigroupShadow)(Graphics_Drawing.shadowColor(Color.black))(Graphics_Drawing.shadowBlur(5.0)))(cannon))(Prelude["<>"](Graphics_Drawing.semigroupDrawing)(Data_Foldable.foldMap(Data_Foldable.foldableArray)(Graphics_Drawing.monoidDrawing)(renderProjectile)(v.projectiles))(Prelude["<>"](Graphics_Drawing.semigroupDrawing)(Data_Foldable.foldMap(Data_Foldable.foldableArray)(Graphics_Drawing.monoidDrawing)(renderEnemy)(v.enemies))(infos))));
 };
 var bounce = function (v) {
     var newVelocity = (function () {
-        var $65 = v.position.y < 10.0 || v.position.y > 400.0;
-        if ($65) {
+        var $74 = v.position.y < 10.0 || v.position.y > 400.0;
+        if ($74) {
             return {
                 x: v.velocity.x, 
                 y: -v.velocity.y
             };
         };
-        if (!$65) {
+        if (!$74) {
             return {
                 x: v.velocity.x, 
                 y: v.velocity.y
             };
         };
-        throw new Error("Failed pattern match at Main line 77, column 21 - line 80, column 3: " + [ $65.constructor.name ]);
+        throw new Error("Failed pattern match at Main line 82, column 21 - line 85, column 3: " + [ $74.constructor.name ]);
     })();
-    var $66 = {};
-    for (var $67 in v) {
-        if (v.hasOwnProperty($67)) {
-            $66[$67] = v[$67];
+    var $75 = {};
+    for (var $76 in v) {
+        if (v.hasOwnProperty($76)) {
+            $75[$76] = v[$76];
         };
     };
-    $66.velocity = newVelocity;
-    return $66;
+    $75.velocity = newVelocity;
+    return $75;
 };
 var step = function (v) {
     return function (v1) {
         var newEnemyCooldown = (function () {
-            var $75 = v1.enemyCooldown === 0;
-            if ($75) {
+            var $84 = v1.enemyCooldown === 0;
+            if ($84) {
                 return 300;
             };
-            if (!$75) {
+            if (!$84) {
                 return v1.enemyCooldown - 1;
             };
-            throw new Error("Failed pattern match at Main line 102, column 26 - line 103, column 7: " + [ $75.constructor.name ]);
+            throw new Error("Failed pattern match at Main line 107, column 26 - line 108, column 7: " + [ $84.constructor.name ]);
         })();
-        var newEnemies = Prelude.append(Prelude.semigroupArray)(Prelude.map(Prelude.functorArray)(function ($98) {
-            return move(bounce($98));
+        var newEnemies = Prelude.append(Prelude.semigroupArray)(Prelude.map(Prelude.functorArray)(function ($113) {
+            return move(bounce($113));
         })(sweep(v1.enemies)))((function () {
-            var $76 = v1.enemyCooldown === 0;
-            if ($76) {
-                return [ newEnemy ];
+            var $85 = v1.enemyCooldown === 0;
+            if ($85) {
+                return [ newEnemy(v.randomColor) ];
             };
-            if (!$76) {
+            if (!$85) {
                 return [  ];
             };
-            throw new Error("Failed pattern match at Main line 99, column 20 - line 102, column 7: " + [ $76.constructor.name ]);
+            throw new Error("Failed pattern match at Main line 104, column 20 - line 107, column 7: " + [ $85.constructor.name ]);
         })());
         var doesNewProjectileSpawn = v.click && v1.cannonCooldown === 0;
         var newCannonCooldown = (function () {
@@ -9035,35 +9371,36 @@ var step = function (v) {
                 return 10;
             };
             if (!doesNewProjectileSpawn) {
-                var $78 = v1.cannonCooldown === 0;
-                if ($78) {
+                var $87 = v1.cannonCooldown === 0;
+                if ($87) {
                     return 0;
                 };
-                if (!$78) {
+                if (!$87) {
                     return v1.cannonCooldown - 1;
                 };
-                throw new Error("Failed pattern match at Main line 105, column 32 - line 108, column 7: " + [ $78.constructor.name ]);
+                throw new Error("Failed pattern match at Main line 110, column 32 - line 113, column 7: " + [ $87.constructor.name ]);
             };
-            throw new Error("Failed pattern match at Main line 103, column 27 - line 108, column 7: " + [ doesNewProjectileSpawn.constructor.name ]);
+            throw new Error("Failed pattern match at Main line 108, column 27 - line 113, column 7: " + [ doesNewProjectileSpawn.constructor.name ]);
         })();
         var cannonDirection = $$Math.atan2(-($$Math.max(cannonPosition.x)(v.position.x) - cannonPosition.x))(v.position.y - cannonPosition.y);
-        var newProjectiles = (function ($99) {
-            return Data_Array.filter(cull)(Prelude.map(Prelude.functorArray)(move)($99));
+        var newProjectiles = (function ($114) {
+            return Data_Array.filter(cull)(Prelude.map(Prelude.functorArray)(move)($114));
         })(sweep(Prelude.append(Prelude.semigroupArray)(v1.projectiles)((function () {
             if (doesNewProjectileSpawn) {
-                return [ newProjectile(cannonDirection) ];
+                return [ newProjectile(cannonDirection)(v.cannonColor) ];
             };
             if (!doesNewProjectileSpawn) {
                 return [  ];
             };
-            throw new Error("Failed pattern match at Main line 96, column 24 - line 99, column 7: " + [ doesNewProjectileSpawn.constructor.name ]);
+            throw new Error("Failed pattern match at Main line 101, column 24 - line 104, column 7: " + [ doesNewProjectileSpawn.constructor.name ]);
         })())));
         return mark({
             projectiles: newProjectiles, 
             enemies: newEnemies, 
             enemyCooldown: newEnemyCooldown, 
             cannonDirection: cannonDirection, 
-            cannonCooldown: newCannonCooldown
+            cannonCooldown: newCannonCooldown, 
+            cannonColor: v.cannonColor
         });
     };
 };
@@ -9071,31 +9408,54 @@ var main = function __do() {
     var v = Graphics_Canvas.getCanvasElementById("canvas")();
     if (v instanceof Data_Maybe.Just) {
         var v1 = Graphics_Canvas.getContext2D(v.value0)();
+        var tickColor = Signal_Time.every(500.0);
         var tick = Signal_Time.every(16.0);
+        var cannonColor = Prelude["<$>"](Signal.functorSignal)(function (v2) {
+            return v2.color;
+        })(Signal.foldp(function (v2) {
+            return function (v3) {
+                return {
+                    color: Color.hsl(v3.counter)(0.5)(0.5), 
+                    counter: v3.counter + 15.0
+                };
+            };
+        })({
+            color: Color.white, 
+            counter: 0.0
+        })(tickColor));
         var v2 = Signal_DOM.mouseButton(0)();
         var v3 = Signal_DOM.mousePos();
-        var inputs = Prelude["<*>"](Signal.applySignal)(Prelude["<*>"](Signal.applySignal)(Prelude["<$>"](Signal.functorSignal)(function (v4) {
-            return function (v5) {
-                return function (v6) {
-                    return {
-                        deltat: v4, 
-                        click: v5, 
-                        position: v6
+        var v4 = Signal.unwrap(Prelude["<$>"](Signal.functorSignal)(Prelude["const"](Prelude["<$>"](Control_Monad_Eff.functorEff)(function (x) {
+            return Color.hsl(x)(0.5)(0.5);
+        })(Control_Monad_Eff_Random.randomRange(0.0)(360.0))))(tickColor))();
+        var inputs = Prelude["<*>"](Signal.applySignal)(Prelude["<*>"](Signal.applySignal)(Prelude["<*>"](Signal.applySignal)(Prelude["<*>"](Signal.applySignal)(Prelude["<$>"](Signal.functorSignal)(function (v5) {
+            return function (v6) {
+                return function (v7) {
+                    return function (v8) {
+                        return function (v9) {
+                            return {
+                                deltat: v5, 
+                                click: v6, 
+                                position: v7, 
+                                randomColor: v8, 
+                                cannonColor: v9
+                            };
+                        };
                     };
                 };
             };
-        })(tick))(v2))(Prelude["<#>"](Signal.functorSignal)(v3)(function (v4) {
+        })(tick))(v2))(Prelude["<#>"](Signal.functorSignal)(v3)(function (v5) {
             return {
-                x: Data_Int.toNumber(v4.x), 
-                y: Data_Int.toNumber(v4.y)
+                x: Data_Int.toNumber(v5.x), 
+                y: Data_Int.toNumber(v5.y)
             };
-        }));
+        })))(v4))(cannonColor);
         var state = Signal.foldp(step)(initialState)(Signal.sampleOn(tick)(inputs));
-        return Signal.runSignal(Prelude["<#>"](Signal.functorSignal)(state)(function ($100) {
-            return Graphics_Drawing.render(v1)(renderS($100));
+        return Signal.runSignal(Prelude["<#>"](Signal.functorSignal)(state)(function ($115) {
+            return Graphics_Drawing.render(v1)(renderS($115));
         }))();
     };
-    throw new Error("Failed pattern match at Main line 160, column 8 - line 173, column 47: " + [ v.constructor.name ]);
+    throw new Error("Failed pattern match at Main line 172, column 8 - line 194, column 47: " + [ v.constructor.name ]);
 };
 module.exports = {
     main: main, 
@@ -9118,7 +9478,7 @@ module.exports = {
     hole: hole
 };
 
-},{"Color":"/home/creek/Documents/chromacannon/output/Color/index.js","Control.Monad.Eff":"/home/creek/Documents/chromacannon/output/Control.Monad.Eff/index.js","Data.Array":"/home/creek/Documents/chromacannon/output/Data.Array/index.js","Data.Foldable":"/home/creek/Documents/chromacannon/output/Data.Foldable/index.js","Data.Int":"/home/creek/Documents/chromacannon/output/Data.Int/index.js","Data.Maybe":"/home/creek/Documents/chromacannon/output/Data.Maybe/index.js","Data.Monoid":"/home/creek/Documents/chromacannon/output/Data.Monoid/index.js","Data.Tuple":"/home/creek/Documents/chromacannon/output/Data.Tuple/index.js","Debug.Trace":"/home/creek/Documents/chromacannon/output/Debug.Trace/index.js","Graphics.Canvas":"/home/creek/Documents/chromacannon/output/Graphics.Canvas/index.js","Graphics.Drawing":"/home/creek/Documents/chromacannon/output/Graphics.Drawing/index.js","Graphics.Drawing.Font":"/home/creek/Documents/chromacannon/output/Graphics.Drawing.Font/index.js","Math":"/home/creek/Documents/chromacannon/output/Math/index.js","Prelude":"/home/creek/Documents/chromacannon/output/Prelude/index.js","Signal":"/home/creek/Documents/chromacannon/output/Signal/index.js","Signal.DOM":"/home/creek/Documents/chromacannon/output/Signal.DOM/index.js","Signal.Time":"/home/creek/Documents/chromacannon/output/Signal.Time/index.js","Unsafe.Coerce":"/home/creek/Documents/chromacannon/output/Unsafe.Coerce/index.js","Vector2D":"/home/creek/Documents/chromacannon/output/Vector2D/index.js"}],"/home/creek/Documents/chromacannon/output/Math/foreign.js":[function(require,module,exports){
+},{"Color":"/home/creek/Documents/chromacannon/output/Color/index.js","Control.Monad.Eff":"/home/creek/Documents/chromacannon/output/Control.Monad.Eff/index.js","Control.Monad.Eff.Random":"/home/creek/Documents/chromacannon/output/Control.Monad.Eff.Random/index.js","Data.Array":"/home/creek/Documents/chromacannon/output/Data.Array/index.js","Data.Foldable":"/home/creek/Documents/chromacannon/output/Data.Foldable/index.js","Data.Int":"/home/creek/Documents/chromacannon/output/Data.Int/index.js","Data.Maybe":"/home/creek/Documents/chromacannon/output/Data.Maybe/index.js","Data.Monoid":"/home/creek/Documents/chromacannon/output/Data.Monoid/index.js","Data.Tuple":"/home/creek/Documents/chromacannon/output/Data.Tuple/index.js","Debug.Trace":"/home/creek/Documents/chromacannon/output/Debug.Trace/index.js","Graphics.Canvas":"/home/creek/Documents/chromacannon/output/Graphics.Canvas/index.js","Graphics.Drawing":"/home/creek/Documents/chromacannon/output/Graphics.Drawing/index.js","Graphics.Drawing.Font":"/home/creek/Documents/chromacannon/output/Graphics.Drawing.Font/index.js","Math":"/home/creek/Documents/chromacannon/output/Math/index.js","Prelude":"/home/creek/Documents/chromacannon/output/Prelude/index.js","Signal":"/home/creek/Documents/chromacannon/output/Signal/index.js","Signal.DOM":"/home/creek/Documents/chromacannon/output/Signal.DOM/index.js","Signal.Time":"/home/creek/Documents/chromacannon/output/Signal.Time/index.js","Unsafe.Coerce":"/home/creek/Documents/chromacannon/output/Unsafe.Coerce/index.js","Vector2D":"/home/creek/Documents/chromacannon/output/Vector2D/index.js"}],"/home/creek/Documents/chromacannon/output/Math/foreign.js":[function(require,module,exports){
 /* global exports */
 "use strict";
 
