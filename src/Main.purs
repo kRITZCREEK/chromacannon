@@ -6,6 +6,7 @@ import Control.Monad.Eff
 import Control.Monad.Eff.Random
 
 import Color
+import Color.Scheme.MaterialDesign as MD
 
 import Data.Array (snoc, filter, length)
 import Data.Int (toNumber)
@@ -53,6 +54,7 @@ type State =
   , cannonDirection :: Number
   , cannonColor :: Color
   , points :: Int
+  , lost :: Boolean
   }
 
 hole :: forall a. a
@@ -101,8 +103,9 @@ mark s@{projectiles, enemies} =
 
 sweep = filter (not <<< _.hit)
 
+step _ s@{lost: true} = s
 step { deltat, click, position: {x, y}, randomColor, cannonColor }
-     { projectiles, enemies, enemyCooldown, cannonCooldown, points } =
+     { projectiles, enemies, enemyCooldown, cannonCooldown, points, lost } =
   let newProjectiles = sweep >>> map move >>> filter cull $ projectiles
                        `append` if doesNewProjectileSpawn
                                 then [newProjectile cannonDirection cannonColor] else []
@@ -118,6 +121,7 @@ step { deltat, click, position: {x, y}, randomColor, cannonColor }
       newPoints = points + length (filter _.hit enemies)
       cannonDirection = atan2 (negate ((max cannonPosition.x x) - cannonPosition.x)) (y - cannonPosition.y)
       doesNewProjectileSpawn = click && cannonCooldown == 0
+      newLost = lost || any (\e -> e.position.x <= 0.0) newEnemies
   in
    mark { projectiles: newProjectiles
         , enemies: newEnemies
@@ -126,6 +130,7 @@ step { deltat, click, position: {x, y}, randomColor, cannonColor }
         , cannonCooldown: newCannonCooldown
         , cannonColor
         , points: newPoints
+        , lost: newLost
         }
 
 initialState = { projectiles: []
@@ -135,15 +140,20 @@ initialState = { projectiles: []
                , cannonCooldown: 0
                , cannonColor: white
                , points: 0
+               , lost: false
                }
 
 clear = filled (fillColor black) (rectangle 0.0 0.0 800.0 600.0) <> filled (fillColor white) (rectangle 10.0 10.0 780.0 580.0)
-clearCannon = translate 18.0 220.0 $ filled (fillColor white) (circle 0.0 0.0 102.5)
 
 colorFromDirection cannonDirection = hsl (360.0 * (sin cannonDirection)) 0.8 0.5
 
 renderS :: State -> Drawing
-renderS { projectiles, enemies, cannonDirection, cannonCooldown, cannonColor, points } =
+renderS { lost: true, points } =
+  let text' = text (font monospace 60 mempty)
+  in
+   text' 130.0 280.0 (fillColor MD.red) "AT LEAST YOU TRIED"
+   <> text' 130.0 330.0 (fillColor MD.purple) ("POINTS: " <> show points)
+renderS { projectiles, enemies, cannonDirection, cannonCooldown, cannonColor, points, lost } =
   clear
   <> shadow (shadowColor black <> shadowBlur 5.0) cannon
   <> foldMap renderProjectile projectiles
