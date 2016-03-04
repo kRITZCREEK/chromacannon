@@ -60,12 +60,16 @@ type State =
 hole :: forall a. a
 hole = unsafeCoerce unit
 
-cannonPosition = {x: 18.0, y: 280.0}
+cannonPosition = { x: 18.0, y: 280.0 }
 
 cull :: forall e. {position :: Vector2D | e} -> Boolean
-cull {position: {x, y}} = x >= 0.0 && x <= 800.0 && y >= 0.0 && y <= 600.0
+cull { position: { x, y } } = x >= 0.0 && x <= 800.0 && y >= 0.0 && y <= 600.0
 
-newEnemy c = {position: {x: 700.0, y: 200.0}, velocity: {x: negate 1.0, y: 4.0 }, color: c, hit: false}
+newEnemy c =
+  { position: { x: 700.0, y: 200.0 }
+  , velocity: { x: negate 1.0, y: 4.0 }
+  , color: c, hit: false
+  }
 
 newProjectile cannonDirection cannonColor =
   let s = runPure playSound
@@ -79,12 +83,12 @@ newProjectile cannonDirection cannonColor =
   }
 
 move :: forall e
-        . {position :: Vector2D, velocity :: Vector2D | e}
-        -> {position :: Vector2D, velocity :: Vector2D | e}
-move (r@{position, velocity}) = r {position = V2.addV2 position velocity}
+        .  { position :: Vector2D, velocity :: Vector2D | e }
+        -> { position :: Vector2D, velocity :: Vector2D | e }
+move r@{ position, velocity } = r { position = V2.addV2 position velocity }
 
 bounce :: Enemy -> Enemy
-bounce e@{position: {y}, velocity: {x: vx, y: vy}} =
+bounce e@{position: { y }, velocity: {x: vx, y: vy}} =
   let newVelocity = if y < 30.0 || y > 570.0
                     then {x: vx, y: negate vy}
                     else {x: vx, y: vy}
@@ -153,7 +157,7 @@ renderS { lost: true, points } =
   in
    text' 130.0 280.0 (fillColor MD.red) "AT LEAST YOU TRIED"
    <> text' 130.0 330.0 (fillColor MD.purple) ("POINTS: " <> show points)
-renderS { projectiles, enemies, cannonDirection, cannonCooldown, cannonColor, points, lost } =
+renderS { projectiles, enemies, cannonDirection, cannonCooldown, cannonColor, points } =
   clear
   <> shadow (shadowColor black <> shadowBlur 5.0) cannon
   <> foldMap renderProjectile projectiles
@@ -210,11 +214,13 @@ main = do
   clicks <- mouseButton 0
   pos <- mousePos
   randomColor <- Signal.unwrap (const ((\x -> hsl x 0.5 0.5) <$> randomRange 0.0 360.0) <$> tickColor)
-  let inputs = ({deltat: _, click: _, position: _, randomColor: _, cannonColor: _} <$>
+
+
+  let inputs = {deltat: _, click: _, position: _, randomColor: _, cannonColor: _} <$>
                 tick <*>
                 clicks <*>
-                (pos <#> \ {x, y} -> {x: toNumber x, y: toNumber y})) <*>
+                (pos <#> \ {x, y} -> {x: toNumber x, y: toNumber y}) <*>
                 randomColor <*>
                 cannonColor
   let state = Signal.foldp step initialState (Signal.sampleOn tick inputs)
-  Signal.runSignal $ state <#> render ctx <<< renderS
+  Signal.runSignal (state <#> render ctx <<< renderS)
