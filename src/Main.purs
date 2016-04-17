@@ -1,36 +1,33 @@
 module Main where
 
-import Prelude
-
-import Control.Monad.Eff
-import Control.Monad.Eff.Random
-
-import Color
-import Color.Scheme.MaterialDesign as MD
-
-import Data.Array (snoc, filter, length)
-import Data.Int (toNumber)
-import Data.Foldable (any, foldMap)
-import Data.Maybe
-import Data.Monoid (mempty)
-import Data.Tuple
-
-import Debug.Trace
-
-import Graphics.Canvas (getCanvasElementById, getContext2D)
 import Graphics.Drawing
-import Graphics.Drawing.Font (font, monospace)
-
-import Math (atan2, sin, cos, max)
-
+import Color.Scheme.MaterialDesign as MD
 import Signal as Signal
-import Signal.DOM
-import Signal.Time (Time, since, every)
-
-import Unsafe.Coerce
-
 import Vector2D as V2
+import Control.Monad.Eff (runPure, Eff)
+import Control.Monad.Eff.Random (RANDOM, randomRange)
+import DOM (DOM)
+import Data.Array (filter, length)
+import Data.Foldable (any, foldMap)
+import Data.Int (toNumber)
+import Data.Maybe.Unsafe (fromJust)
+import Data.Monoid (mempty)
+import Graphics.Canvas (Canvas, getCanvasElementById, getContext2D)
+import Graphics.Drawing.Font (font, monospace)
+import Math (atan2, sin, cos, max)
+import Prelude (Unit, (<#>), (<*>), const, (/), show, (*), (<>), (+), (==), append, ($), map, (>>>), not, (<<<), (<$>), (-), (>), (||), (<), negate, (<=), bind, unit, (>=), (&&))
+import Signal.DOM (mouseButton, mousePos)
+import Signal.Time (every)
+import Unsafe.Coerce (unsafeCoerce)
 import Vector2D (Vector2D)
+
+type Input =
+  { cannonColor :: Color
+  , randomColor :: Color
+  , position :: Point
+  , click :: Boolean
+  , deltat :: Number
+  }
 
 type Projectile =
   { position :: Vector2D
@@ -60,17 +57,20 @@ type State =
 hole :: forall a. a
 hole = unsafeCoerce unit
 
+cannonPosition :: Point
 cannonPosition = { x: 18.0, y: 280.0 }
 
 cull :: forall e. {position :: Vector2D | e} -> Boolean
 cull { position: { x, y } } = x >= 0.0 && x <= 800.0 && y >= 0.0 && y <= 600.0
 
+newEnemy :: Color -> Enemy
 newEnemy c =
   { position: { x: 700.0, y: 200.0 }
   , velocity: { x: negate 1.0, y: 4.0 }
   , color: c, hit: false
   }
 
+newProjectile :: Number -> Color -> Projectile
 newProjectile cannonDirection cannonColor =
   let s = runPure playSound
   in
@@ -105,8 +105,10 @@ mark s@{projectiles, enemies} =
      , enemies = (\e -> e {hit = any (collides e) projectiles}) <$> enemies
      }
 
+sweep :: forall t8. Array { hit :: Boolean | t8} -> Array { hit :: Boolean | t8}
 sweep = filter (not <<< _.hit)
 
+step :: Input -> State -> State
 step _ s@{lost: true} = s
 step { deltat, click, position: {x, y}, randomColor, cannonColor }
      { projectiles, enemies, enemyCooldown, cannonCooldown, points, lost } =
@@ -137,6 +139,7 @@ step { deltat, click, position: {x, y}, randomColor, cannonColor }
         , lost: newLost
         }
 
+initialState :: State
 initialState = { projectiles: []
                , enemies: []
                , enemyCooldown: 0
@@ -147,9 +150,12 @@ initialState = { projectiles: []
                , lost: false
                }
 
+clear :: Drawing
 clear = filled (fillColor black) (rectangle 0.0 0.0 800.0 600.0) <> filled (fillColor white) (rectangle 10.0 10.0 780.0 580.0)
 
-colorFromDirection cannonDirection = hsl (360.0 * (sin cannonDirection)) 0.8 0.5
+colorFromDirection :: Number -> Color
+colorFromDirection cannonDirection =
+  hsl (360.0 * (sin cannonDirection)) 0.8 0.5
 
 renderS :: State -> Drawing
 renderS { lost: true, points } =
@@ -183,6 +189,7 @@ renderS { projectiles, enemies, cannonDirection, cannonCooldown, cannonColor, po
              <> outlined (outlineColor black <> lineWidth 3.0) (circle 0.0 0.0 15.0)
              <> flash
 
+renderProjectile :: Projectile -> Drawing
 renderProjectile { position: {x, y}, velocity, color } =
   let c = circle x y 20.0
       c1 = filled
@@ -193,15 +200,17 @@ renderProjectile { position: {x, y}, velocity, color } =
              (circle (x - (1.5 * velocity.x)) (y - (1.5 * velocity.y)) 20.0)
   in c2 <> c1 <> filled (fillColor color) c
 
+renderEnemy :: Enemy -> Drawing
 renderEnemy { position: {x, y}, velocity, color } =
   let c = circle x y 30.0
   in filled (fillColor color) c
 
 foreign import playSound :: forall eff. Eff eff Unit
 
+main :: forall e. Eff ( canvas :: Canvas , dom :: DOM , random :: RANDOM | e) Unit
 main = do
-  Just c <- getCanvasElementById "canvas"
-  ctx <- getContext2D c
+  c <- getCanvasElementById "canvas"
+  ctx <- getContext2D (fromJust c)
 
   -- tick <- animationFrame
   let tick = every 16.0
