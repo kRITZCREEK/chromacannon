@@ -1,6 +1,7 @@
 module Main where
 
 import Graphics.Drawing
+import Color as Color
 import Color.Scheme.MaterialDesign as MD
 import Signal as Signal
 import Vector2D as V2
@@ -10,11 +11,12 @@ import DOM (DOM)
 import Data.Array (filter, length)
 import Data.Foldable (any, foldMap)
 import Data.Int (toNumber)
-import Data.Maybe.Unsafe (fromJust)
+import Data.Maybe (fromJust)
 import Data.Monoid (mempty)
-import Graphics.Canvas (Canvas, getCanvasElementById, getContext2D)
+import Graphics.Canvas (CANVAS, getCanvasElementById, getContext2D)
 import Graphics.Drawing.Font (font, monospace)
-import Math (atan2, sin, cos, max)
+import Math (atan2, sin, cos, max, abs)
+import Partial.Unsafe (unsafePartial)
 import Prelude (Unit, (<#>), (<*>), const, (/), show, (*), (<>), (+), (==), append, ($), map, (>>>), not, (<<<), (<$>), (-), (>), (||), (<), negate, (<=), bind, unit, (>=), (&&))
 import Signal.DOM (mouseButton, mousePos)
 import Signal.Time (every)
@@ -99,7 +101,7 @@ mark :: forall e
         -> {projectiles :: Array Projectile, enemies :: Array Enemy | e}
 mark s@{projectiles, enemies} =
   let collides {position: {x: x1, y: y1 }, color: c1} {position: {x: x2, y: y2 }, color: c2} =
-        Math.abs (x1 - x2) < 20.0 && Math.abs (y1 - y2) < 20.0 && distance c1 c2 < 50.0
+        abs (x1 - x2) < 20.0 && abs (y1 - y2) < 20.0 && distance c1 c2 < 50.0
   in
    s { projectiles = (\p -> p {hit = any (collides p) enemies}) <$> projectiles
      , enemies = (\e -> e {hit = any (collides e) projectiles}) <$> enemies
@@ -207,10 +209,10 @@ renderEnemy { position: {x, y}, velocity, color } =
 
 foreign import playSound :: forall eff. Eff eff Unit
 
-main :: forall e. Eff ( canvas :: Canvas , dom :: DOM , random :: RANDOM | e) Unit
+main :: forall e. Eff ( canvas :: CANVAS , dom :: DOM , random :: RANDOM | e) Unit
 main = do
   c <- getCanvasElementById "canvas"
-  ctx <- getContext2D (fromJust c)
+  ctx <- getContext2D (unsafePartial fromJust c)
 
   -- tick <- animationFrame
   let tick = every 16.0
