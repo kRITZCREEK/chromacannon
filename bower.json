@@ -18,6 +18,7 @@
     "purescript-colors": "^1.0.0"
   },
   "devDependencies": {
-    "purescript-debug": "^1.0.0"
+    "purescript-debug": "^1.0.0",
+    "purescript-psci-support": "^1.0.0"
   }
 }

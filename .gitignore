@@ -7,3 +7,4 @@
 /.psa-stash
 /app.js
 /reload
+.DS_Store
