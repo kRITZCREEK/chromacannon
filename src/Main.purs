@@ -1,66 +1,25 @@
 module Main where
 
 import Graphics.Drawing
-import Color as Color
-import Color.Scheme.MaterialDesign as MD
 import Signal as Signal
 import Vector2D as V2
+import Chroma.Render (renderS, cannonPosition)
+import Chroma.Types (Input, State, Projectile, Enemy)
 import Control.Monad.Eff (runPure, Eff)
 import Control.Monad.Eff.Random (RANDOM, randomRange)
+import Control.Timer (TIMER)
 import DOM (DOM)
 import Data.Array (filter, length)
-import Data.Foldable (any, foldMap)
+import Data.Foldable (any)
 import Data.Int (toNumber)
 import Data.Maybe (fromJust)
-import Data.Monoid (mempty)
 import Graphics.Canvas (CANVAS, getCanvasElementById, getContext2D)
-import Graphics.Drawing.Font (font, monospace)
 import Math (atan2, sin, cos, max, abs)
 import Partial.Unsafe (unsafePartial)
-import Prelude (Unit, (<#>), (<*>), const, (/), show, (*), (<>), (+), (==), append, ($), map, (>>>), not, (<<<), (<$>), (-), (>), (||), (<), negate, (<=), bind, unit, (>=), (&&))
-import Signal.DOM (mouseButton, mousePos)
+import Prelude (Unit, const, bind, negate, append, map, not, (<<<), (<#>), (<*>), (<$>), (+), (<=), (||), (==), (&&), (-), (>>>), ($), (<), (>), (>=))
+import Signal.DOM (animationFrame, mouseButton, mousePos)
 import Signal.Time (every)
-import Unsafe.Coerce (unsafeCoerce)
 import Vector2D (Vector2D)
-
-type Input =
-  { cannonColor :: Color
-  , randomColor :: Color
-  , position :: Point
-  , click :: Boolean
-  , deltat :: Number
-  }
-
-type Projectile =
-  { position :: Vector2D
-  , velocity :: Vector2D
-  , color :: Color
-  , hit :: Boolean
-  }
-
-type Enemy =
-  { position :: Vector2D
-  , velocity :: Vector2D
-  , color :: Color
-  , hit :: Boolean
-  }
-
-type State =
-  { projectiles :: Array Projectile
-  , enemies :: Array Enemy
-  , enemyCooldown :: Int
-  , cannonCooldown :: Int
-  , cannonDirection :: Number
-  , cannonColor :: Color
-  , points :: Int
-  , lost :: Boolean
-  }
-
-hole :: forall a. a
-hole = unsafeCoerce unit
-
-cannonPosition :: Point
-cannonPosition = { x: 18.0, y: 280.0 }
 
 cull :: forall e. {position :: Vector2D | e} -> Boolean
 cull { position: { x, y } } = x >= 0.0 && x <= 800.0 && y >= 0.0 && y <= 600.0
@@ -152,71 +111,19 @@ initialState = { projectiles: []
                , lost: false
                }
 
-clear :: Drawing
-clear = filled (fillColor black) (rectangle 0.0 0.0 800.0 600.0) <> filled (fillColor white) (rectangle 10.0 10.0 780.0 580.0)
-
-colorFromDirection :: Number -> Color
-colorFromDirection cannonDirection =
-  hsl (360.0 * (sin cannonDirection)) 0.8 0.5
-
-renderS :: State -> Drawing
-renderS { lost: true, points } =
-  let text' = text (font monospace 60 mempty)
-  in
-   text' 130.0 280.0 (fillColor MD.red) "AT LEAST YOU TRIED"
-   <> text' 130.0 330.0 (fillColor MD.purple) ("POINTS: " <> show points)
-renderS { projectiles, enemies, cannonDirection, cannonCooldown, cannonColor, points } =
-  clear
-  <> shadow (shadowColor black <> shadowBlur 5.0) cannon
-  <> foldMap renderProjectile projectiles
-  <> foldMap renderEnemy enemies
-  <> infos
-  where
-    infoText = text (font monospace 16 mempty) 100.0 30.0 (fillColor black)
-    infos = infoText ("Projectiles: " <> show (length projectiles))
-            <> (translate 0.0 20.0 $ infoText ("Points: " <> show (points)))
-            <> (translate 0.0 40.0 $ infoText ("Enemies: " <> show (length enemies)))
-    color = fillColor cannonColor
-    flash = if cannonCooldown == 0
-            then filled (fillColor black) $ mempty
-            else filled (fillColor black) (circle 0.0 0.0 (20.0 + 30.0 / (toNumber cannonCooldown)))
-                 <> filled (fillColor white) (circle 0.0 0.0 (10.0 + 30.0 / (toNumber cannonCooldown)))
-    cannon = translate cannonPosition.x cannonPosition.y
-             <<< rotate cannonDirection
-             $ translate (negate 10.0) 0.0
-             (filled color (rectangle 0.0 0.0 20.0 100.0))
-             <> translate (negate 10.0) 0.0
-             (outlined (outlineColor black <> lineWidth 3.0) (rectangle 0.0 0.0 20.0 100.0))
-             <> filled color (circle 0.0 0.0 15.0)
-             <> outlined (outlineColor black <> lineWidth 3.0) (circle 0.0 0.0 15.0)
-             <> flash
-
-renderProjectile :: Projectile -> Drawing
-renderProjectile { position: {x, y}, velocity, color } =
-  let c = circle x y 20.0
-      c1 = filled
-             (fillColor (Color.lighten 0.2 color))
-             (circle (x - velocity.x) (y - velocity.y) 20.0)
-      c2 = filled
-             (fillColor (Color.lighten 0.3 color))
-             (circle (x - (1.5 * velocity.x)) (y - (1.5 * velocity.y)) 20.0)
-  in c2 <> c1 <> filled (fillColor color) c
-
-renderEnemy :: Enemy -> Drawing
-renderEnemy { position: {x, y}, velocity, color } =
-  let c = circle x y 30.0
-  in filled (fillColor color) c
-
 foreign import playSound :: forall eff. Eff eff Unit
 
-main :: forall e. Eff ( canvas :: CANVAS , dom :: DOM , random :: RANDOM | e) Unit
+main :: forall e. Eff ( canvas :: CANVAS
+                      , dom :: DOM
+                      , random :: RANDOM
+                      , timer :: TIMER
+                      | e) Unit
 main = do
   c <- getCanvasElementById "canvas"
   ctx <- getContext2D (unsafePartial fromJust c)
 
-  -- tick <- animationFrame
-  let tick = every 16.0
-      tickColor = every 500.0
+  tick <- animationFrame
+  let tickColor = every 500.0
       cannonColor = _.color <$>
         Signal.foldp
           (\_ {counter} -> {color: hsl counter 0.5 0.5, counter: counter + 10.0})
@@ -232,6 +139,6 @@ main = do
                 clicks <*>
                 (pos <#> \ {x, y} -> {x: toNumber x, y: toNumber y}) <*>
                 randomColor <*>
-                cannonColor
+                cannonColoj
   let state = Signal.foldp step initialState (Signal.sampleOn tick inputs)
   Signal.runSignal (state <#> render ctx <<< renderS)
